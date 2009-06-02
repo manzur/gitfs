@@ -7,11 +7,7 @@ Gitindex : module
 
 	HEADERSZ: con 32;
 #This is a entry size up to name field
-	ENTRYSZ:  con 60; 
-	QIDSZ:    con 16;
-	BIGSZ:    con 8;
-	INTSZ:    con 4;
-	SHALEN:   con 20;
+	ENTRYSZ:  con 64; 
 
 #This constant is used for determining whether hash 
 #table needs resizing. If entriesnt * CLSBND >= hashcap,
@@ -35,6 +31,7 @@ Gitindex : module
 		dtype:   int;
 		dev:     int;
 		mtime:   int;
+		mode:    int;
 		length:  big;
 		sha1:    array of byte;
 		namelen: int;

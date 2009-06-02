@@ -12,18 +12,31 @@ Strhash : import tables;
 include "gitindex.m";
 	gitindex : Gitindex;
 
-include "keyring.m";
-	keyring: Keyring;
+include "utils.m";
+	utils: Utils;
+
+
+QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
 
 
 stderr : ref Sys->FD;
+filebuf: array of byte;
 
 Index.new(): ref Index
 {
+	tables = load Tables Tables->PATH;
+	sys = load Sys Sys->PATH;
+	utils = load Utils Utils->PATH;
+
+	utils->init();
+	
+	stderr = sys->fildes(2);
+
 	ret: Index;
 	ret.header = nil;
 	ret.entries = nil;
 	ret.hashcap = 0;
+
 	return ref ret;
 }
 
@@ -51,11 +64,12 @@ Index.addfile(index: self ref Index, path : string) : int
 		}
 	}
 
+	utils->writeblobfile(path);
 	entry := initentry(path);
 	index.entries.add(entry.name, entry);
+
 	return 0;
 }
-
 
 Index.rmfile(index: self ref Index, path : string) 
 {
@@ -71,11 +85,7 @@ Index.rmfile(index: self ref Index, path : string)
 #return - number of elements read from index file
 Index.readindex(index: self ref Index, path : string) : int
 {
-	tables = load Tables Tables->PATH;
-	sys = load Sys Sys->PATH;
-	
-	stderr = sys->fildes(2);
-	
+
 	indexfd := sys->open(path, Sys->OREAD);
 
 	if(indexfd == nil)
@@ -155,9 +165,14 @@ Index.writeindex(index: self ref Index, path : string) : int
 			sys->print("couldn't write entry to the file: %r\n");
 			return cnt;
 		}
+		#each entry is aligned by 8  
+		remainder : int;
+		remainder = (ENTRYSZ + (hd l).namelen + 8) & ~7; 
+		remainder -= ENTRYSZ + (hd l).namelen;
+		sys->write(fd, array[remainder] of byte, remainder);
+
 	}
 
-	sys->print("wrote to file\n");
 	return index.header.entriescnt;
 }
 
@@ -226,6 +241,10 @@ Entry.unpack(entry : self ref Entry) : array of byte
 	copyarray(ret, offset, temp, 0, len temp);
 	offset += len temp;
 
+	temp = int2bytes(entry.mode);
+	copyarray(ret, offset, temp, 0, len temp);
+	offset += len temp;
+
 	temp =  big2bytes(entry.length);
 	copyarray(ret, offset, temp, 0, len temp);
 	offset += len temp;
@@ -259,6 +278,9 @@ Entry.pack(buf : array of byte) : ref Entry
 	offset += INTSZ;
 	
 	entry.mtime = bytes2int(buf, offset);
+	offset += INTSZ;
+
+	entry.mode = bytes2int(buf, offset);
 	offset += INTSZ;
 
 	entry.length = bytes2big(buf, offset);
@@ -355,35 +377,16 @@ initentry(filename: string): ref Entry
 	entry.dtype = dirstat.dtype;
 	entry.dev = dirstat.dev;
 	entry.mtime = dirstat.mtime;
+	entry.mode = dirstat.mode;
 	entry.length = dirstat.length;
-	entry.sha1 = filesha1(filename); 
+	entry.sha1 = utils->filesha1(filename); 
 	entry.namelen = len filename;
 	entry.name = filename;
 
 	return ref entry;
 }
 
-filesha1(filename: string): array of byte
-{
-	fd := sys->open(filename, Sys->OREAD);
-	if(fd == nil)
-	{
-		sys->fprint(stderr,"open file error: %r\n");
-		return nil;
-	}
 
-	buf := array[Sys->ATOMICIO] of byte;
-	cnt : int;
-	state : ref Keyring->DigestState = nil;
-	while((cnt = sys->read(fd, buf, Sys->ATOMICIO)) > 0)
-	{
-		state = keyring->sha1(buf,cnt, nil, state);		
-	}
-	sha := array[SHALEN] of byte;
-	keyring->sha1(buf,0, sha, state);
-	
-	return sha;
-}
 
 verifypath(path : string) : int
 {
@@ -393,7 +396,6 @@ verifypath(path : string) : int
 verifyheader(header: ref Header): int
 {
 #Code should be add for verifying sha of the whole file
-	keyring = load Keyring Keyring->PATH;
 	return 	header.signature == CACHESIGNATURE &&
 		header.version == 1 &&
 		header.entriescnt >= 0;

@@ -32,7 +32,6 @@ init(nil: ref Draw->Context, args: list of string)
 	tables = load Tables Tables->PATH;
 
 	index = gitindex->Index.new();
-
 	cnt := index.readindex("index");
 
 
@@ -55,8 +54,8 @@ init(nil: ref Draw->Context, args: list of string)
 	}
 	
 	printindex(index);
-	
-	index.writeindex("index1");
+	sys->print("writing to index\n");
+	index.writeindex("index");
 	
 }
 
@@ -68,5 +67,4 @@ printindex(index: ref Index)
 		sys->print("Name: %s\n", (hd l).name);
 		sys->print("Length: %bd\n", (hd l).length);
 	}
-	sys->print("out print\n");
 }

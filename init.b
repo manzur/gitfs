@@ -15,6 +15,10 @@ include "gitindex.m";
 
 Header: import gitindex;
 
+include "utils.m";
+	
+SHALEN: import Utils;
+
 
 Initgit: module
 {
@@ -28,15 +32,17 @@ init(nil: ref Draw->Context, args: list of string)
 	gitindex = load Gitindex Gitindex->PATH;
 	keyring := load Keyring Keyring->PATH;
 
+	stderr := sys->fildes(2);
+
 	sys->print("Initing git repo\n");
 
 	header: gitindex->Header;
 	header.signature = gitindex->CACHESIGNATURE;
 	header.version = 1;
 	header.entriescnt = 0;
-	header.sha1 = array[gitindex->SHALEN] of byte;
+	header.sha1 = array[SHALEN] of byte;
 	newheader := ref header;
-	temp := newheader.unpack()[:gitindex->HEADERSZ - gitindex->SHALEN];
+	temp := newheader.unpack()[:gitindex->HEADERSZ - SHALEN];
 	
 	keyring->sha1(temp, len temp, header.sha1, nil);
 	
@@ -44,10 +50,24 @@ init(nil: ref Draw->Context, args: list of string)
 
 	if((fd = sys->create("index", Sys->OWRITE, 644)) == nil ||
 	   sys->write(fd, temp, len temp) != len temp ||
-	   sys->write(fd, header.sha1, gitindex->SHALEN) != gitindex->SHALEN)
+	   sys->write(fd, header.sha1, SHALEN) != SHALEN)
 	{
-		sys->print("error in creating index file: %r\n");
+		sys->fprint(stderr,"error in creating index file: %r\n");
 		return;
+	}
+
+	if(sys->create("objects", Sys->OREAD, Sys->DMDIR | 8r700) == nil)
+	{
+		sys->fprint(stderr, "objects dir couldn't be created: %r\n");
+		return;
+	}
+
+	for(i := 0; i <= 255; i++)
+	{
+		dirname := sys->sprint("objects/%02x", i);
+		dirfd := sys->create(dirname,Sys->OREAD,sys->DMDIR | 8r700);
+		if(dirfd == nil)
+			sys->fprint(stderr, "directory %s couldn't be created: %r\n", dirname);
 	}
 
 	sys->print("Init finish\n");
