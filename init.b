@@ -13,7 +13,8 @@ Strhash: import Tables;
 include "gitindex.m";
 	gitindex: Gitindex;
 
-Header: import gitindex;
+Header, Index: import gitindex;
+
 
 include "utils.m";
 	
@@ -31,6 +32,8 @@ init(nil: ref Draw->Context, args: list of string)
 	sys := load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	keyring := load Keyring Keyring->PATH;
+
+	gitindex->Index.new();
 
 	stderr := sys->fildes(2);
 

@@ -54,15 +54,20 @@ writetreefile(): string
 	for(l := index.entries.all(); l != nil; l = tl l)
 	{
 		entry := hd l;
-		filelist += sys->sprint("%o %s", entry.mode, entry.name);
-		filelist += string array[1] of {byte 0};
+		filelist += sys->sprint("%o %s%c", entry.mode, entry.name,'\0');
 		filelist += sha2string(entry.sha1);
 	}
 	fsize := len array of byte filelist;
 
-	header := sys->sprint("tree %d", fsize);
+	sys->print("[[[[%d]]]]\n", fsize);
 
-	buf := array of byte (header + filelist);
+	header := sys->sprint("tree %d", fsize );
+	headerlen := len array of byte header;
+
+	buf := array[len header + len filelist + 1] of byte;
+	buf[:] = array of byte header;
+	buf[headerlen] = byte 0;
+	buf[headerlen + 1:] = array of byte filelist;
 	offset := 0;
 
 	rqchan := deflate->start("z");

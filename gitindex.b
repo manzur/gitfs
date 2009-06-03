@@ -17,7 +17,7 @@ include "utils.m";
 
 
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-
+bytes2int, bytes2big, big2bytes, int2bytes, allocnr, copyarray: import utils;
 
 stderr : ref Sys->FD;
 filebuf: array of byte;
@@ -64,9 +64,11 @@ Index.addfile(index: self ref Index, path : string) : int
 		}
 	}
 
-	utils->writeblobfile(path);
+	sha := utils->writeblobfile(path);
 	entry := initentry(path);
+	entry.sha1 = sha;
 	index.entries.add(entry.name, entry);
+	sys->print("File added: %s\n", utils->sha2string(entry.sha1));
 
 	return 0;
 }
@@ -310,58 +312,6 @@ packqid(buf: array of byte, offset: int): Sys->Qid
 	return qid;
 }
 
-bytes2int(buf: array of byte, offset: int): int
-{
-	ret := 0;
-	for(i := 0; i < INTSZ; i++)
-		ret |= int(buf[offset + i]) << (i * 8); 
-	return ret;
-}
-
-bytes2big(buf: array of byte, offset: int): big
-{
-	return (big bytes2int(buf,offset + INTSZ) << INTSZ * 8)| 
-	       (big bytes2int(buf, offset));
-
-}
-
-big2bytes(n: big): array of byte
-{
-	ret := array[BIGSZ] of byte;
-
-	part1 := int (n >> INTSZ * 8);
-	part2 := int n;
-	copyarray(ret, 0, int2bytes(part2), 0, INTSZ);
-	copyarray(ret, INTSZ, int2bytes(part1), 0, INTSZ);
-	
-	return ret;
-}
-
-int2bytes(number: int): array of byte
-{
-	ret := array[INTSZ] of byte;
-
-	ret[0] = byte (number & 16rff);
-	number >>= 8;
-
-	ret[1] = byte (number & 16rff);
-	number >>= 8;
-	
-	ret[2] = byte (number & 16rff);
-	number >>= 8;
-	
-	ret[3] = byte (number & 16rff);
-	
-	return ret;
-}
-
-
-
-allocnr(num: int): int
-{
-	return (num + 16) * 3 / 2;
-}
-
 initentry(filename: string): ref Entry
 {
 	entry: Entry;
@@ -399,14 +349,6 @@ verifyheader(header: ref Header): int
 	return 	header.signature == CACHESIGNATURE &&
 		header.version == 1 &&
 		header.entriescnt >= 0;
-}
-
-copyarray(dst : array of byte, doffset : int, src : array of byte, soffset, count : int)
-{
-	for(i := 0; i < count; i++)
-	{
-		dst[i + doffset] = src[i + soffset];
-	}
 }
 
 unpackqid(qid : Sys->Qid) : array of byte

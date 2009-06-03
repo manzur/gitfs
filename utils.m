@@ -9,8 +9,8 @@ Utils: module
 
 	init:          fn();
 	
-	writeblobfile: fn(path: string): int;
-	readsha1file:  fn(path: string): array of byte;
+	writeblobfile: fn(path: string): array of byte;
+	readsha1file:  fn(path: string): (string, int, array of byte);
 
 	filesha1:      fn(path: string): array of byte;
 	bufsha1:       fn(buf: array of byte): array of byte;
@@ -20,5 +20,14 @@ Utils: module
 	save2file:     fn(path: string, buf: array of byte): int;
 	string2path:   fn(filename: string): string;
 	sha2string:    fn(sha: array of byte): string;
+
+	bytes2int:     fn(buf: array of byte, offset: int): int;
+	bytes2big:     fn(buf: array of byte, offset: int): big;
+	big2bytes:     fn(n: big): array of byte;
+	int2bytes:     fn(number: int): array of byte;
+	allocnr:       fn(num: int): int;
+
+	copyarray:     fn(dst: array of byte, doffset: int, src: array of byte, soffset, count : int);
+
 };
 
