@@ -28,6 +28,7 @@ Index.new(): ref Index
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 
+
 	utils->init();
 	
 	stderr = sys->fildes(2);
@@ -82,6 +83,16 @@ Index.rmfile(index: self ref Index, path : string)
 	}
 	index.header.entriescnt--;
 	index.entries.del(path);
+}
+
+Header.new(): ref Header
+{
+	header: Header;
+	header.signature = CACHESIGNATURE;
+	header.version   = 1;
+	header.entriescnt = 0;
+	header.sha1 = array[SHALEN] of byte;
+	return ref header;
 }
 
 #return - number of elements read from index file

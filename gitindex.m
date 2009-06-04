@@ -22,6 +22,7 @@ Gitindex : module
 		sha1:       array of byte;
 		pack:       fn(buf: array of byte): ref Header;
 		unpack:     fn(header: self ref Header): array of byte;
+		new:	    fn(): ref Header;
 	};
 
 	

@@ -199,6 +199,12 @@ bufsha1(buf: array of byte): array of byte
 	return sha;
 }
 
+exists(shaname: string): int
+{
+	return sys->open(string2path(shaname), Sys->OREAD) != nil;
+}
+
+
 filesha1(filename: string): array of byte
 {
 	fd := sys->open(filename, Sys->OREAD);

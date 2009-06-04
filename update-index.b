@@ -16,7 +16,10 @@ include "gitindex.m";
 include "arg.m";
 	arg: Arg;
 
+include "utils.m";	
+
 Index: import gitindex;
+INDEXPATH: import Utils;
 
 index: ref Index;
 
@@ -31,8 +34,8 @@ init(nil: ref Draw->Context, args: list of string)
 	gitindex = load Gitindex Gitindex->PATH;
 	tables = load Tables Tables->PATH;
 
-	index = gitindex->Index.new();
-	cnt := index.readindex("index");
+	index = Index.new();
+	cnt := index.readindex(INDEXPATH);
 
 
 	arg = load Arg Arg->PATH;
@@ -54,8 +57,8 @@ init(nil: ref Draw->Context, args: list of string)
 	}
 	
 	printindex(index);
-	sys->print("writing to index\n");
-	index.writeindex("index");
+	sys->print("Writing to index\n");
+	index.writeindex(INDEXPATH);
 	
 }
 

@@ -17,12 +17,12 @@ include "utils.m";
 include "gitindex.m";
 	gitindex: Gitindex;
 
-Index: import gitindex;
 
 include "filter.m";
 	deflate: Filter;
 
-int2string, bufsha1, save2file, string2path, sha2string: import utils;
+int2string, bufsha1, save2file, string2path, sha2string, SHALEN: import utils;
+Index: import gitindex;
 
 Writetree: module
 {
@@ -36,6 +36,7 @@ init(nil: ref Draw->Context, args: list of string)
 	deflate = load Filter Filter->DEFLATEPATH;
 	tables = load Tables Tables->PATH;
 	utils = load Utils Utils->PATH;
+
 	utils->init();
 	deflate->init();
 	gitindex = load Gitindex Gitindex->PATH;
@@ -46,16 +47,30 @@ init(nil: ref Draw->Context, args: list of string)
 writetreefile(): string
 {
 	
-	index := gitindex->Index.new();
+	index := Index.new();
 	index.readindex("index");
 
 
-	filelist: string = "";
+	filelist := array[0] of byte;
 	for(l := index.entries.all(); l != nil; l = tl l)
 	{
+		#F***ing zero; There's no way to write 0 byte except converting list to the array of byte
+		#Don't blame me for this stupid code
+
 		entry := hd l;
-		filelist += sys->sprint("%o %s%c", entry.mode, entry.name,'\0');
-		filelist += sha2string(entry.sha1);
+		temp := array of byte sys->sprint("%o %s", entry.mode, entry.name);
+		oldfilelist := filelist;
+		filelist = array[len oldfilelist + len temp + 1 + SHALEN] of byte;
+		filelist[:] = oldfilelist;
+		offset := len oldpfilelist;
+		sys->print("off2: %d\n", offset);
+		filelist[offset:] = temp;
+		offset += len temp;
+		sys->print("off2: %d\n", offset);
+		#filelist[offset:] = entry.sha1;
+		sys->write(sys->fildes(1), temp, len temp);
+		sys->print("sep\n");
+		sys->write(sys->fildes(1), filelist, len filelist);
 	}
 	fsize := len array of byte filelist;
 
@@ -64,12 +79,13 @@ writetreefile(): string
 	header := sys->sprint("tree %d", fsize );
 	headerlen := len array of byte header;
 
+	#+1 is for 0 byte,which is used as a separator
 	buf := array[len header + len filelist + 1] of byte;
 	buf[:] = array of byte header;
 	buf[headerlen] = byte 0;
-	buf[headerlen + 1:] = array of byte filelist;
-	offset := 0;
+	buf[headerlen + 1:] = filelist;
 
+	offset := 0;
 	rqchan := deflate->start("z");
 	old := array[0] of byte;
 mainloop:
