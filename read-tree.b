@@ -7,8 +7,6 @@ include "draw.m";
 
 include "utils.m";
 	utils: Utils;
-
-
 readsha1file: import utils;
 
 Readtree: module

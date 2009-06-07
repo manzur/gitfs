@@ -15,6 +15,16 @@ include "filter.m";
 	inflate: Filter;
 	deflate: Filter;
 
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;
+
+include "string.m";
+	strmodule: String;
+
+include "tables.m";
+	tables: Tables;	
+Strhash: import tables;
 
 
 hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
@@ -27,33 +37,21 @@ init()
 	keyring = load Keyring Keyring->PATH;
 	inflate = load Filter Filter->INFLATEPATH;
 	deflate = load Filter Filter->DEFLATEPATH;
+	bufio   = load Bufio Bufio->PATH;
+	strmodule = load String String->PATH;
+	tables = load Tables Tables->PATH;
 	inflate->init();
 	deflate->init();
 }
 
-writeblobfile(path: string): array of byte
+writesha1file(ch: chan of (int, array of byte))
 {
-
-	fd := sys->open(path, Sys->OREAD);
-	if(fd == nil)
-	{
-		return nil;
-	}
-
-	(ret, dirstat) := sys->stat(path);
-	if(ret != 0)
-	{
-		sys->print("error in getting stat information: %r\n");
-		return nil;
-	}
-
-	filesize := dirstat.length;
 
 	rqchan := deflate->start("z");
 	old := array[0] of byte;
 
-	meta := 1;
-
+	buf: array of byte;
+	sz := 0;
 mainloop:
 	while(1)
 	{
@@ -71,43 +69,27 @@ mainloop:
 				rq.reply <-= 0;
 
 			Fill => 
-				cnt := len rq.buf;
-				buf := array[cnt] of byte;
-				if(meta)
-				{
-					buf1 := array of byte sys->sprint("blob %bd", filesize);
-					buf = array[len buf1 + 1] of byte;
-					buf[:] = buf1;
-					buf[len buf1] = byte 0;
-					cnt = len buf;
-					meta = 0;
-				}
-				else
-				{
-					cnt = sys->read(fd, buf, cnt);
-				}
+				(sz, buf) = <-ch;	
 				rq.buf[:] = buf[:];
-				rq.reply <-= cnt;
-
+				rq.reply <-= sz;
 			Error =>
 				sys->print("error ocurred: %s\n", rq.e);
-				return nil;
+				return;
 		}
 	}
 		
 	sha := bufsha1(old);		    
 	save2file(string2path(sha2string(sha)), old);
-
-	return sha;
-	
+	sys->print("file was written to: %s\n", sha2string(sha));
+	ch <-= (SHALEN, sha);	
 }
 
 readsha1file(shafilename: string): (string, int, array of byte)
 {
-	fd := sys->open("objects/"+ shafilename[:2] + "/" + shafilename[2:], Sys->OREAD);
+	fd := sys->open(string2path(shafilename), Sys->OREAD);
 	if(fd == nil)
 	{
-		sys->print("file note found\n");
+		sys->print(stderr, "file not found: %r\n");
 		return ("", 0, nil);
 	}
 
@@ -143,13 +125,12 @@ mainloop:
 	}
 	
 		
-	for(i:= 0; i < len old; i++)
+	for(i := 0; i < len old; i++)
 	{
 		if(old[i] == byte 0)
 			break;
 	}
 
-	sys->print("o is located at: %d of %d\n", i, len old);
 	if(i < 0 || i >= len old)
 	{
 		sys->print("wrong file format\n");
@@ -157,9 +138,6 @@ mainloop:
 	}
 
 	pos := strchr(string old[:i], ' ');
-
-	sys->print("pos is %d\n", pos);
-	sys->print("bytes2int result: %d\n",bytes2int(old, pos + 1));
 
 	return (string old[:pos], bytes2int(old, pos + 1), old[i+1:]);
 
@@ -292,8 +270,6 @@ int2bytes(number: int): array of byte
 	return ret;
 }
 
-
-
 allocnr(num: int): int
 {
 	return (num + 16) * 3 / 2;
@@ -303,6 +279,66 @@ copyarray(dst : array of byte, doffset : int, src : array of byte, soffset, coun
 {
 	for(i := 0; i < count; i++)
 		dst[i + doffset] = src[i + soffset];
+}
+
+equalqids(q1, q2: Sys->Qid): int
+{
+	return q1.path  == q2.path &&
+	       q1.vers  == q2.vers &&
+	       q1.qtype == q2.qtype;    	
+}
+
+extractfile(shafilename: string): string
+{
+	tempfile := "/tmp/gitfile";
+	buf := (readsha1file(shafilename)).t2;	
+	fd := sys->create(tempfile, Sys->OWRITE, 8r644);
+	
+	offset := 0;
+	while(offset < len buf)
+		offset += sys->write(fd, buf[offset:len buf], len buf - offset);
+
+	return tempfile;
+}
+
+getuserinfo(): ref Strhash[ref Config]
+{
+	iobuf := bufio->open("config", Bufio->OREAD);
+	config := Strhash[ref Config].new(10, nil);
+	while((s := iobuf.gets('\n')) != "")		
+	{
+		if(iswhitespace(s))
+			return nil;
+		s = chomp(s);
+		(s1, s2) := strmodule->splitl(s, "=");
+		s2 = s2[1:];
+		config.add(s1, ref Config(s1, s2));
+	}
+	return config;
+}
+
+iswhitespace(s: string): int
+{
+	return s == "\n" || s == "\t" || s == " ";
+}
+
+chomp(s: string): string
+{
+	return s[:len s - 1];
+}
+
+readline(ibuf: ref Iobuf): string
+{
+	ret := "";
+	i := 0;
+	while(1)
+	{
+		c := ibuf.getc();
+		if(c == '\n' || c < 0)
+			break;
+		ret[i++] = c;
+	}
+	return ret;
 }
 
 

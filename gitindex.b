@@ -14,10 +14,8 @@ include "gitindex.m";
 
 include "utils.m";
 	utils: Utils;
-
-
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-bytes2int, bytes2big, big2bytes, int2bytes, allocnr, copyarray: import utils;
+bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray: import utils;
 
 stderr : ref Sys->FD;
 filebuf: array of byte;
@@ -28,17 +26,15 @@ Index.new(): ref Index
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 
-
 	utils->init();
-	
 	stderr = sys->fildes(2);
 
-	ret: Index;
-	ret.header = nil;
-	ret.entries = nil;
-	ret.hashcap = 0;
+	index: Index;
+	index.header = Header.new();
+	index.entries = nil;
+	index.hashcap = 0;
 
-	return ref ret;
+	return ref index;
 }
 
 Index.addfile(index: self ref Index, path : string) : int
@@ -65,13 +61,47 @@ Index.addfile(index: self ref Index, path : string) : int
 		}
 	}
 
-	sha := utils->writeblobfile(path);
+	sha := writeblobfile(path);
 	entry := initentry(path);
 	entry.sha1 = sha;
-	index.entries.add(entry.name, entry);
-	sys->print("File added: %s\n", utils->sha2string(entry.sha1));
+	if((elem := index.entries.find(entry.name)) != nil)
+	{
+		copyentry(elem, entry);
+		index.header.entriescnt--;
+	}
+	else
+		index.entries.add(entry.name, entry);
+
+	sys->print("File added: %s\n", sha2string(entry.sha1));
 
 	return 0;
+}
+
+writeblobfile(path: string): array of byte
+{
+	fd := sys->open(path, Sys->OREAD);
+	(ret, dirstat) := sys->stat(path);
+	buf := array[Sys->ATOMICIO] of byte;
+	ch := chan of (int, array of byte);
+	sha: array of byte;
+	sz: int;
+	
+	temp := array of byte sys->sprint("blob %bd", dirstat.length);
+	spawn utils->writesha1file(ch);
+	buf[:] = temp;
+	buf[len temp] = byte 0;
+	cnt := len temp + 1;
+	while(1)
+	{
+		ch <-= (cnt, buf);
+		if(cnt == 0)
+		{
+			(sz, sha) = <-ch;
+			break;
+		}
+		cnt = sys->read(fd, buf, len buf);
+	}
+	return sha;
 }
 
 Index.rmfile(index: self ref Index, path : string) 
@@ -95,7 +125,7 @@ Header.new(): ref Header
 	return ref header;
 }
 
-#return - number of elements read from index file
+#return: number of elements read from index file
 Index.readindex(index: self ref Index, path : string) : int
 {
 
@@ -153,7 +183,7 @@ Index.readindex(index: self ref Index, path : string) : int
 	return index.header.entriescnt;
 }
 
-#return - number of elements written to the index file
+#return: number of elements written to the index file
 Index.writeindex(index: self ref Index, path : string) : int
 {
 	fd := sys->create(path, Sys->OWRITE, 8r644);
@@ -183,7 +213,6 @@ Index.writeindex(index: self ref Index, path : string) : int
 		remainder = (ENTRYSZ + (hd l).namelen + 8) & ~7; 
 		remainder -= ENTRYSZ + (hd l).namelen;
 		sys->write(fd, array[remainder] of byte, remainder);
-
 	}
 
 	return index.header.entriescnt;
@@ -340,7 +369,7 @@ initentry(filename: string): ref Entry
 	entry.mtime = dirstat.mtime;
 	entry.mode = dirstat.mode;
 	entry.length = dirstat.length;
-	entry.sha1 = utils->filesha1(filename); 
+	entry.sha1 = filesha1(filename); 
 	entry.namelen = len filename;
 	entry.name = filename;
 
@@ -356,7 +385,7 @@ verifypath(path : string) : int
 
 verifyheader(header: ref Header): int
 {
-#Code should be add for verifying sha of the whole file
+#FIXME: Code should be add for verifying sha of the whole file
 	return 	header.signature == CACHESIGNATURE &&
 		header.version == 1 &&
 		header.entriescnt >= 0;
@@ -382,3 +411,15 @@ unpackqid(qid : Sys->Qid) : array of byte
 	return ret;
 }
 
+copyentry(dst, src: ref Entry)
+{
+	dst.qid = src.qid;
+	dst.dtype = src.dtype;
+	dst.dev = src.dev;
+	dst.mtime = src.mtime;
+	dst.mode = src.mode;
+	dst.length = src.length;
+	dst.sha1 = src.sha1;
+	dst.namelen = src.namelen;
+	dst.name = src.name;
+}	

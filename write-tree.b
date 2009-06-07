@@ -7,22 +7,20 @@ include "draw.m";
 
 include "tables.m";
 	tables: Tables;
-
 Strhash: import tables;
 
 include "utils.m";
 	utils: Utils;
+int2string, bufsha1, save2file, string2path, sha2string, SHALEN: import utils;
 
 
 include "gitindex.m";
 	gitindex: Gitindex;
+Index: import gitindex;
 
 
 include "filter.m";
 	deflate: Filter;
-
-int2string, bufsha1, save2file, string2path, sha2string, SHALEN: import utils;
-Index: import gitindex;
 
 Writetree: module
 {
@@ -58,23 +56,18 @@ writetreefile(): string
 		#Don't blame me for this stupid code
 
 		entry := hd l;
+		entry.mode = fillmode(entry.mode);
+		sys->print("mode: %o", entry.mode);
 		temp := array of byte sys->sprint("%o %s", entry.mode, entry.name);
 		oldfilelist := filelist;
 		filelist = array[len oldfilelist + len temp + 1 + SHALEN] of byte;
 		filelist[:] = oldfilelist;
-		offset := len oldpfilelist;
-		sys->print("off2: %d\n", offset);
+		offset := len oldfilelist;
 		filelist[offset:] = temp;
 		offset += len temp;
-		sys->print("off2: %d\n", offset);
-		#filelist[offset:] = entry.sha1;
-		sys->write(sys->fildes(1), temp, len temp);
-		sys->print("sep\n");
-		sys->write(sys->fildes(1), filelist, len filelist);
+		filelist[offset:] = entry.sha1;
 	}
 	fsize := len array of byte filelist;
-
-	sys->print("[[[[%d]]]]\n", fsize);
 
 	header := sys->sprint("tree %d", fsize );
 	headerlen := len array of byte header;
@@ -85,45 +78,21 @@ writetreefile(): string
 	buf[headerlen] = byte 0;
 	buf[headerlen + 1:] = filelist;
 
-	offset := 0;
-	rqchan := deflate->start("z");
-	old := array[0] of byte;
-mainloop:
-	while(1)
-	{
-		pick rq := <-rqchan
-		{
-			Finished => if(len rq.buf > 0) 
-					sys->print("Data remained\n");
-				    break mainloop;
 
-			Result => 
-				new := array[len old + len rq.buf] of byte;
-				new[:] = old;
-				new[len old:] = rq.buf;
-				old = new;
-				rq.reply <-= 0;
-
-			Fill => 
-				cnt := len rq.buf;
-				if(cnt > len buf - offset)
-					cnt = len buf - offset;
-				rq.buf[:] = buf[offset:offset + cnt];
-				offset += cnt;
-				rq.reply <-= cnt;
-
-			Error =>
-				sys->print("error ocurred: %s\n", rq.e);
-				return "";
-		}
-	}
-		
-	sha := bufsha1(old);		    
-	treename := string2path(sha2string(sha));
-	save2file(treename, old);
-
-	return treename;
+	ch := chan of (int, array of byte);
+	spawn utils->writesha1file(ch);
+	sha: array of byte;
+	sz: int;
+	ch <-= (len buf, buf);
+	ch <-= (0, buf);
+	(sz, sha) = <-ch;
+	
+	return sha2string(sha);
 }
 
-
+fillmode(mode: int): int
+{
+	mode &= 1023;
+	mode |= 16384;
+}
 

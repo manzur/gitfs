@@ -12,12 +12,11 @@ Strhash: import Tables;
 
 include "gitindex.m";
 	gitindex: Gitindex;
+Header, Index, HEADERSZ: import gitindex;
 
 include "utils.m";
-	
 INDEXPATH, OBJECTSTOREPATH, SHALEN: import Utils;
 
-Header, Index, HEADERSZ: import gitindex;
 
 
 Initgit: module
@@ -43,7 +42,7 @@ init(nil: ref Draw->Context, args: list of string)
 	
 	keyring->sha1(temp, len temp, header.sha1, nil);
 	
-	if((fd := sys->create(INDEXPATH, Sys->OWRITE, 644)) == nil ||
+	if((fd := sys->create(INDEXPATH, Sys->OWRITE, 8r644)) == nil ||
 	   sys->write(fd, temp, len temp) != len temp ||
 	   sys->write(fd, header.sha1, SHALEN) != SHALEN)
 	{
