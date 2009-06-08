@@ -94,5 +94,6 @@ fillmode(mode: int): int
 {
 	mode &= 1023;
 	mode |= 16384;
+	return mode;
 }
 
