@@ -39,6 +39,7 @@ Gitindex : module
 		name:    string;
 		pack:    fn(buf: array of byte): ref Entry;
 		unpack:  fn(entry: self ref Entry): array of byte;
+		compare: fn(e1: self ref Entry, e2: ref Entry): int;
 	};
 
 	Index : adt

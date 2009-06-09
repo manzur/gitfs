@@ -9,14 +9,17 @@ include "tables.m";
 	tables: Tables;
 Strhash: import tables;
 
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;
+
 include "utils.m";
 	utils: Utils;
 int2string, bufsha1, save2file, string2path, sha2string, SHALEN: import utils;
 
-
 include "gitindex.m";
 	gitindex: Gitindex;
-Index: import gitindex;
+Index, Entry: import gitindex;
 
 
 include "filter.m";
@@ -50,12 +53,13 @@ writetreefile(): string
 
 
 	filelist := array[0] of byte;
-	for(l := index.entries.all(); l != nil; l = tl l)
+	for(l := mergesort(index.entries.all()); l != nil; l = tl l)
 	{
 		#F***ing zero; There's no way to write 0 byte except converting list to the array of byte
 		#Don't blame me for this stupid code
 
 		entry := hd l;
+		sys->print("Writing: %s\n", entry.name);
 		entry.mode = fillmode(entry.mode);
 		sys->print("mode: %o", entry.mode);
 		temp := array of byte sys->sprint("%o %s", entry.mode, entry.name);
@@ -95,5 +99,81 @@ fillmode(mode: int): int
 	mode &= 1023;
 	mode |= 16384;
 	return mode;
+}
+
+mergesort(l: list of ref Entry): list of ref Entry
+{
+	if(len l > 1)
+	{
+		sys->print("in mergesort: %d\n", len l);
+		middle := len l / 2;
+		(l1, l2) := partitionbypos(l, middle);
+		l1 = mergesort(l1);
+		l2 = mergesort(l2);
+		return merge(l1, l2);
+	}
+	return l;
+}
+
+merge(l1, l2: list of ref Entry): list of ref Entry
+{
+	if(l1 == nil)
+		return l2;
+	if(l2 == nil)
+		return l1;
+	
+	l: list of ref Entry = nil;
+	while(l1 != nil && l2 != nil)
+	{
+		if((hd l1).compare(hd l2) == 1)
+		{
+			l = hd l1 :: l;
+			l1 = tl l1;
+			continue;
+		}
+		l = hd l2 :: l;
+		l2 = tl l2;
+	}
+
+	while(l1 != nil)
+	{
+		l = hd l1 :: l;
+		l1 = tl l1;
+	}
+
+	while(l2 != nil)
+	{
+		l = hd l2 :: l;
+		l2 = tl l2;
+	}
+
+	l = reverse(l);
+	return l;
+}
+
+partitionbypos(l: list of ref Entry, pos: int): (list of ref Entry, list of ref Entry)
+{
+	if(len l < pos)
+		return (l, nil);
+	l1 : list of ref Entry = nil;
+	for(i := 0; i < pos; i++)
+	{
+		l1 = hd l :: l1;
+		l = tl l;
+	}
+	return (reverse(l1), l);
+}
+
+
+
+reverse(l: list of ref Entry): list of ref Entry
+{
+	l1: list of ref Entry = nil;
+	while(l != nil)
+	{
+		l1 = hd l :: l1;
+		l = tl l;
+	}
+	return l1;
 }
 

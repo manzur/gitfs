@@ -8,6 +8,9 @@ include "tables.m";
 
 Strhash : import tables;
 
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;	
 
 include "gitindex.m";
 	gitindex : Gitindex;
@@ -17,6 +20,9 @@ include "utils.m";
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
 bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray: import utils;
 
+include "keyring.m";
+	keyring: Keyring;
+
 stderr : ref Sys->FD;
 filebuf: array of byte;
 
@@ -25,6 +31,7 @@ Index.new(): ref Index
 	tables = load Tables Tables->PATH;
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
+	keyring = load Keyring Keyring->PATH;
 
 	utils->init();
 	stderr = sys->fildes(2);
@@ -193,12 +200,30 @@ Index.writeindex(index: self ref Index, path : string) : int
 		return 0;
 	}
 
+	state: ref Keyring->DigestState = nil;
+	temp := int2bytes(index.header.signature);
+	state = keyring->sha1(temp, len temp, nil, state);
+
+	temp = int2bytes(index.header.version);
+	state = keyring->sha1(temp, len temp, nil, state);
+
+	temp = int2bytes(index.header.entriescnt);
+	state = keyring->sha1(temp, len temp, nil, state);
+
+	for(l := index.entries.all(); l != nil; l = tl l)
+	{
+		temp = (hd l).unpack();
+		state = keyring->sha1(temp, len temp, nil, state);
+	}
+
+	keyring->sha1(temp, 0, index.header.sha1, state);
+	sys->print("sha1: %s", utils->sha2string(index.header.sha1));
 	header := index.header.unpack();
 	sys->write(fd, header, len header);
 
 	entrybuf : array of byte;
 	cnt := 0;
-	for(l := index.entries.all(); l != nil; l = tl l)
+	for(l = index.entries.all(); l != nil; l = tl l)
 	{
 		entrybuf = (hd l).unpack();
 
@@ -423,3 +448,22 @@ copyentry(dst, src: ref Entry)
 	dst.namelen = src.namelen;
 	dst.name = src.name;
 }	
+
+Entry.compare(e1: self ref Entry, e2: ref Entry): int
+{
+	namelen := e1.namelen;
+	if(e2.namelen < namelen) namelen = e2.namelen;
+
+	for(i := 0; i < namelen; i++)
+	{
+		if(e1.name[i] < e2.name[i])
+			return 1;
+		else if(e1.name[i] > e2.name[i])
+			return -1;
+	}
+	if(e1.namelen < e2.namelen)
+		return 1;
+	else if(e1.namelen > e2.namelen)
+		return -1;
+	return 0;
+}

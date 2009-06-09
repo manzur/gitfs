@@ -17,6 +17,10 @@ include "gitindex.m";
 include "arg.m";
 	arg: Arg;
 
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;
+	
 include "utils.m";	
 
 Index: import gitindex;
@@ -66,6 +70,7 @@ init(nil: ref Draw->Context, args: list of string)
 printindex(index: ref Index)
 {
 	table := index.entries;
+	if(table == nil) sys->print("its nill\n");
 	for( l := table.all(); l != nil; l = tl l)
 	{
 		sys->print("Name: %s\n", (hd l).name);
