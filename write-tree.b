@@ -59,9 +59,8 @@ writetreefile(): string
 		#Don't blame me for this stupid code
 
 		entry := hd l;
-		sys->print("Writing: %s\n", entry.name);
 		entry.mode = fillmode(entry.mode);
-		sys->print("mode: %o", entry.mode);
+		sys->print("Writing: %s; mode: %d\n", entry.name, entry.mode);
 		temp := array of byte sys->sprint("%o %s", entry.mode, entry.name);
 		oldfilelist := filelist;
 		filelist = array[len oldfilelist + len temp + 1 + SHALEN] of byte;
@@ -69,7 +68,8 @@ writetreefile(): string
 		offset := len oldfilelist;
 		filelist[offset:] = temp;
 		offset += len temp;
-		filelist[offset:] = entry.sha1;
+		filelist[offset] = byte 0;
+		filelist[offset+1:] = entry.sha1;
 	}
 	fsize := len array of byte filelist;
 
@@ -94,6 +94,7 @@ writetreefile(): string
 	return sha2string(sha);
 }
 
+#used for compatibility with unix mode
 fillmode(mode: int): int
 {
 	mode &= 1023;

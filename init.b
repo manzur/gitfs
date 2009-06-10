@@ -7,12 +7,15 @@ include "draw.m";
 include "keyring.m";
 
 include "tables.m";
-
 Strhash: import Tables;
 
 include "gitindex.m";
 	gitindex: Gitindex;
 Header, Index, HEADERSZ: import gitindex;
+
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;	
 
 include "utils.m";
 INDEXPATH, OBJECTSTOREPATH, SHALEN: import Utils;

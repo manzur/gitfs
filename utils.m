@@ -40,7 +40,7 @@ Utils: module
 
 	equalqids:     fn(q1,q2: Sys->Qid): int;
 	extractfile:   fn(shafilename: string): string;
-
+	equalshas:     fn(sha1, sha2: array of byte): int;
 	getuserinfo:   fn():ref Strhash[ref Config];
 
 	chomp:         fn(s: string): string;

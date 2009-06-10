@@ -26,7 +26,7 @@ Gitindex : module
 	};
 
 	
-	Entry : adt
+	Entry: adt
 	{
 		qid:     Sys->Qid;
 		dtype:   int;
@@ -40,14 +40,16 @@ Gitindex : module
 		pack:    fn(buf: array of byte): ref Entry;
 		unpack:  fn(entry: self ref Entry): array of byte;
 		compare: fn(e1: self ref Entry, e2: ref Entry): int;
+		new:     fn(): ref Entry;
 	};
 
-	Index : adt
+	Index: adt
 	{
 		header:     ref Header;
 		entries:    ref Strhash[ref Entry]; 	
 		hashcap:    int;
 		addfile:    fn(index: self ref Index, path: string): int;
+		addentry:   fn(index: self ref Index, entry: ref Entry);
 		rmfile:     fn(index: self ref Index, path: string);
 		readindex:  fn(index: self ref Index, path: string): int;
 		writeindex: fn(index: self ref Index, path: string): int;

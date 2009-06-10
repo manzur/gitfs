@@ -113,6 +113,13 @@ checkoutentry(fd: ref Sys->FD, entry: ref Entry)
 		sys->fprint(stderr, "error occured while writing to file: %r\n");
 		return;
 	}
+	dirstat := sys->nulldir;
+	dirstat.mode = entry.mode & 1023;
+	if(sys->fwstat(fd, dirstat))
+	{
+		sys->fprint(stderr, "stat can't be changed: %r\n");
+		return;
+	}
 }
 
 

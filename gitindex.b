@@ -18,7 +18,8 @@ include "gitindex.m";
 include "utils.m";
 	utils: Utils;
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray: import utils;
+bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray, equalshas: import utils;
+
 
 include "keyring.m";
 	keyring: Keyring;
@@ -38,12 +39,13 @@ Index.new(): ref Index
 
 	index: Index;
 	index.header = Header.new();
-	index.entries = nil;
-	index.hashcap = 0;
+	index.hashcap = 37;
+	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
 	return ref index;
 }
 
+#FIXME: Use addentry
 Index.addfile(index: self ref Index, path : string) : int
 {
 
@@ -68,9 +70,9 @@ Index.addfile(index: self ref Index, path : string) : int
 		}
 	}
 
-	sha := writeblobfile(path);
+	sha1 := writeblobfile(path);
 	entry := initentry(path);
-	entry.sha1 = sha;
+	entry.sha1 = sha1;
 	if((elem := index.entries.find(entry.name)) != nil)
 	{
 		copyentry(elem, entry);
@@ -84,13 +86,32 @@ Index.addfile(index: self ref Index, path : string) : int
 	return 0;
 }
 
+Index.addentry(index: self ref Index, entry: ref Entry)
+{
+	index.header.entriescnt++;
+	if(index.header.entriescnt * CLSBND >= index.hashcap)
+	{
+		oldentries := index.entries.all();
+		index.hashcap = allocnr(index.hashcap);
+		index.entries = Strhash[ref Entry].new(index.hashcap, nil);
+
+		while(oldentries != nil)
+		{
+			entry := hd oldentries;
+			index.entries.add(entry.name, entry);
+			oldentries = tl oldentries;
+		}
+	}
+	index.entries.add(entry.name, entry);
+}
+
 writeblobfile(path: string): array of byte
 {
 	fd := sys->open(path, Sys->OREAD);
 	(ret, dirstat) := sys->stat(path);
 	buf := array[Sys->ATOMICIO] of byte;
 	ch := chan of (int, array of byte);
-	sha: array of byte;
+	sha1: array of byte;
 	sz: int;
 	
 	temp := array of byte sys->sprint("blob %bd", dirstat.length);
@@ -103,12 +124,12 @@ writeblobfile(path: string): array of byte
 		ch <-= (cnt, buf);
 		if(cnt == 0)
 		{
-			(sz, sha) = <-ch;
+			(sz, sha1) = <-ch;
 			break;
 		}
 		cnt = sys->read(fd, buf, len buf);
 	}
-	return sha;
+	return sha1;
 }
 
 Index.rmfile(index: self ref Index, path : string) 
@@ -135,13 +156,12 @@ Header.new(): ref Header
 #return: number of elements read from index file
 Index.readindex(index: self ref Index, path : string) : int
 {
-
 	indexfd := sys->open(path, Sys->OREAD);
 
 	if(indexfd == nil)
 	{
 		sys->fprint(stderr,"file access error: %r\n");
-		return 0;
+		return -1;
 	}
 
 	header := array[HEADERSZ] of byte;
@@ -149,15 +169,20 @@ Index.readindex(index: self ref Index, path : string) : int
 	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ)
 	{
 		sys->fprint(stderr, "Index format error: %r\n");
-		return 0;
+		return -1;
 	}
 
 	index.header = Header.pack(header);
-	if(!verifyheader(index.header))
-	{
-		sys->fprint(stderr, "header is not correct\n");
-		return 0;
-	}
+
+	state: ref Keyring->DigestState = nil;
+	temp := int2bytes(index.header.signature);
+	state = keyring->sha1(temp, len temp, nil, state);
+
+	temp = int2bytes(index.header.version);
+	state = keyring->sha1(temp, len temp, nil, state);
+
+	temp = int2bytes(index.header.entriescnt);
+	state = keyring->sha1(temp, len temp, nil, state);
 
 	index.hashcap = index.header.entriescnt * CLSBND * 2;
 
@@ -175,17 +200,28 @@ Index.readindex(index: self ref Index, path : string) : int
 			return 0;
 		}
 
+		state = keyring->sha1(entrybuf, len entrybuf, nil, state);
 		entry := Entry.pack(entrybuf); 
 		namebuf := array[entry.namelen] of byte;
 		sys->read(indexfd, namebuf, entry.namelen);
 		entry.name = string namebuf;	
 		index.entries.add(entry.name, entry);
+		state = keyring->sha1(namebuf, len namebuf, nil, state);
 	
+
 		#each entry is aligned by 8  
 		remainder : int;
 		remainder = (ENTRYSZ + entry.namelen + 8) & ~7; 
 		remainder -= ENTRYSZ + entry.namelen;
 		sys->read(indexfd, entrybuf, remainder);
+	}
+
+	sha1 := array[SHALEN] of byte;
+	keyring->sha1(temp, 0, sha1, state);
+	if(!verifyheader(index.header, sha1))
+	{
+		sys->fprint(stderr, "header is not correct\n");
+		return -1;
 	}
 	return index.header.entriescnt;
 }
@@ -217,11 +253,10 @@ Index.writeindex(index: self ref Index, path : string) : int
 	}
 
 	keyring->sha1(temp, 0, index.header.sha1, state);
-	sys->print("sha1: %s", utils->sha2string(index.header.sha1));
 	header := index.header.unpack();
 	sys->write(fd, header, len header);
 
-	entrybuf : array of byte;
+	entrybuf: array of byte;
 	cnt := 0;
 	for(l = index.entries.all(); l != nil; l = tl l)
 	{
@@ -408,10 +443,10 @@ verifypath(path : string) : int
 	return sys->open(path, Sys->OREAD) != nil;
 }
 
-verifyheader(header: ref Header): int
+verifyheader(header: ref Header, sha1: array of byte): int
 {
-#FIXME: Code should be add for verifying sha of the whole file
-	return 	header.signature == CACHESIGNATURE &&
+	return  equalshas(header.sha1, sha1) &&	
+		header.signature == CACHESIGNATURE &&
 		header.version == 1 &&
 		header.entriescnt >= 0;
 }
@@ -466,4 +501,20 @@ Entry.compare(e1: self ref Entry, e2: ref Entry): int
 	else if(e1.namelen > e2.namelen)
 		return -1;
 	return 0;
+}
+
+Entry.new(): ref Entry
+{
+	entry: Entry;
+	entry.qid = Sys->Qid(big 0,0,0);
+	entry.dtype = 0;
+	entry.dev = 0;
+	entry.mtime = 0;
+	entry.mode = 0;
+	entry.length = big 0;
+	entry.sha1 = array[SHALEN] of byte;
+	entry.namelen = 0;
+	entry.name = "";
+
+	return ref entry;
 }

@@ -30,6 +30,7 @@ Strhash: import tables;
 hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
 			"a","b","c", "d", "e", "f"};
 
+stderr: ref Sys->FD;
 
 init()
 {
@@ -42,6 +43,7 @@ init()
 	tables = load Tables Tables->PATH;
 	inflate->init();
 	deflate->init();
+	stderr = sys->fildes(2);
 }
 
 writesha1file(ch: chan of (int, array of byte))
@@ -89,7 +91,7 @@ readsha1file(shafilename: string): (string, int, array of byte)
 	fd := sys->open(string2path(shafilename), Sys->OREAD);
 	if(fd == nil)
 	{
-		sys->print(stderr, "file not found: %r\n");
+		sys->fprint(stderr, "file not found: %r\n");
 		return ("", 0, nil);
 	}
 
@@ -341,4 +343,12 @@ readline(ibuf: ref Iobuf): string
 	return ret;
 }
 
-
+equalshas(sha1, sha2: array of byte): int
+{
+	for(i := 0; i < SHALEN; i++)
+	{
+		if(sha1[i] != sha2[i])
+			return 0;
+	}
+	return 1;
+}

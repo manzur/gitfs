@@ -39,9 +39,11 @@ init(nil: ref Draw->Context, args: list of string)
 	gitindex = load Gitindex Gitindex->PATH;
 	tables = load Tables Tables->PATH;
 
+	sys->create("index.lock", Sys->OWRITE | Sys->OEXCL, Sys->DMEXCL | 8r644);
 	index = Index.new();
 	cnt := index.readindex(INDEXPATH);
-
+	if(cnt < 0)
+		return;
 
 	arg = load Arg Arg->PATH;
 	arg->init(args);
@@ -63,8 +65,16 @@ init(nil: ref Draw->Context, args: list of string)
 	
 	printindex(index);
 	sys->print("Writing to index\n");
-	index.writeindex(INDEXPATH);
-	
+	index.writeindex("index.lock");
+
+	#renaming index.lock to index
+	dirstat := sys->nulldir;
+	dirstat.name = INDEXPATH;
+	if(sys->wstat("index.lock", dirstat) < 0)
+	{
+		sys->fprint(sys->fildes(2), "file index.lock can't be renamed to index\n");
+		return;
+	}
 }
 
 printindex(index: ref Index)
