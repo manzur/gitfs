@@ -112,7 +112,13 @@ commit(treesha: string, parents: list of string): string
 	
 	commitmsg += getcomment();
 
-	buf := array of byte ("commit " + int2string(len commitmsg) + string (byte 0) + commitmsg);
+	commitlen := int2string(len commitmsg);
+	#6 - "commit", 1 - " ", 1 - '\0'
+	buf := array[6 + 1 + len commitlen + 1 + len commitmsg] of byte;
+
+	buf[:] = array of byte ("commit " + int2string(len commitmsg));
+	buf[7 + len commitlen] = byte 0;
+	buf[7 + len commitlen + 1:] = array of byte commitmsg;
 
 	sys->print("Commitmsg: %s\n", commitmsg);
 

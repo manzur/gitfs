@@ -22,6 +22,9 @@ include "utils.m";
 include "lists.m";
 	lists: Lists;
 
+include "readdir.m";
+	readdir: Readdir;
+	
 
 print : import sys;
 
@@ -74,6 +77,7 @@ init(nil : ref Draw->Context, args : list of string)
 {
 	sys = load Sys Sys->PATH;
 	tables = load Tables Tables->PATH;
+	readdir = load Readdir Readdir->PATH;
 
 	mytable : ref Strhash[ref Someadt];
 	mytable = Strhash[ref Someadt].new(5, nil);
@@ -81,13 +85,36 @@ init(nil : ref Draw->Context, args : list of string)
 	utils = load Utils Utils->PATH;
 	utils->init();
 	
-	a := array[4] of {4,2,5,1};
-	
-	l := list of {11,9};
-	printlist(l);
-	l = mergesort(l);
-	printlist(l);
-	sys->create("popo", Sys->OREAD, Sys->DMDIR|8r755);
+	lists = load Lists Lists->PATH;
+	l1 := list of {"a", "b", "c"};
+
+	l1 = lists->reverse(l1);
+
+	(ret, dirstat) := sys->stat(hd tl args);
+
+	if(!ret && (dirstat.mode & Sys->DMDIR))
+	{
+		(dirs, cnt) := readdir->init(hd tl args, Readdir->NAME);
+		for(i := 0; i < cnt; i++)
+		{
+			sys->print("%s\n", dirs[i].name);
+		}
+	}
+	else
+	{
+		sys->print("not dir\n");
+	}
+
+}
+
+output()
+{
+	fd := sys->open("text1", Sys->OWRITE);
+	buf := array[10] of byte;
+	buf[:] = array of byte "text1";
+	buf[5] = byte 0;
+	buf[6:] = array of byte "next";
+	sys->write(fd, buf, len buf);
 }
 
 printlist(l: list of int) 

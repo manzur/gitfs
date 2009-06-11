@@ -23,10 +23,16 @@ Iobuf: import bufio;
 	
 include "utils.m";	
 
+include "readdir.m";
+	readdir: Readdir;
+
 Index: import gitindex;
 INDEXPATH: import Utils;
 
+
 index: ref Index;
+
+stderr: ref Sys->FD;
 
 Updateindex: module
 {
@@ -38,7 +44,9 @@ init(nil: ref Draw->Context, args: list of string)
 	sys = load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	tables = load Tables Tables->PATH;
+	readdir = load Readdir Readdir->PATH;
 
+	stderr = sys->fildes(2);
 	sys->create("index.lock", Sys->OWRITE | Sys->OEXCL, Sys->DMEXCL | 8r644);
 	index = Index.new();
 	cnt := index.readindex(INDEXPATH);
@@ -54,7 +62,7 @@ init(nil: ref Draw->Context, args: list of string)
 			'a' =>
 				path := arg->arg();
 				sys->print("Adding %s\n", path);
-				index.addfile(path); 
+				addfile(path);
 			'r' =>
 				path := arg->arg();
 				sys->print("Removing %s\n", path);
@@ -85,5 +93,27 @@ printindex(index: ref Index)
 	{
 		sys->print("Name: %s\n", (hd l).name);
 		sys->print("Length: %bd\n", (hd l).length);
+	}
+}
+
+addfile(path: string)
+{
+	(ret, dirstat) := sys->stat(path);
+	if(ret == -1)
+		sys->fprint(stderr, "%s does not exist\n", path);
+	if(dirstat.mode & Sys->DMDIR)
+	{
+		(dirs,cnt)  := readdir->init(path,Readdir->NAME);
+		if(path[len path - 1] != '/')
+			path += "/";
+
+		for(i := 0; i < cnt; i++)
+		{
+			index.addfile(path + dirs[i].name);
+		}
+	}
+	else
+	{
+		index.addfile(path);
 	}
 }

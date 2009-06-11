@@ -27,8 +27,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->print("--%d--\n",daytime->now());
 	sys->print("--%s--\n",daytime->time());
 	path1 := "text";
-	#path2 := ".dircache/objects/b3/e05abc8b98013aa98a71737094ae42039f49fe";
-	path2 := "objects/33/bc1aa3124cf75040f948cd2b115bc40fd4d38e";
+	path2 := "objects/f9/338121f61abecfe310b5f68d1893389193479d";
 #	deflatefile(path1);
 	inflatefile(path2);
 #	modetest("objects");

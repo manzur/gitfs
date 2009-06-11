@@ -20,6 +20,9 @@ include "utils.m";
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
 bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray, equalshas: import utils;
 
+include "exclude.m";
+	exclude: Exclude;
+
 
 include "keyring.m";
 	keyring: Keyring;
@@ -33,8 +36,10 @@ Index.new(): ref Index
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 	keyring = load Keyring Keyring->PATH;
+	exclude = load Exclude Exclude->PATH;
 
 	utils->init();
+	exclude->init();
 	stderr = sys->fildes(2);
 
 	index: Index;
@@ -48,12 +53,12 @@ Index.new(): ref Index
 #FIXME: Use addentry
 Index.addfile(index: self ref Index, path : string) : int
 {
-
 	if(!verifypath(path))
 	{
 		sys->fprint(stderr, "wrong path: %r\n");
 		return -1;
 	}
+	if(exclude->excluded(path)) return -1;
 
 	index.header.entriescnt++;
 	if(index.header.entriescnt * CLSBND >= index.hashcap)
@@ -134,9 +139,9 @@ writeblobfile(path: string): array of byte
 
 Index.rmfile(index: self ref Index, path : string) 
 {
-	if(index.entries.find(path) != nil)
+	if(index.entries.find(path) == nil)
 	{
-		sys->fprint(stderr, "there's no such file in the index\n");
+		sys->fprint(stderr, "there's no such file(%s) in the index\n", path);
 		return;
 	}
 	index.header.entriescnt--;

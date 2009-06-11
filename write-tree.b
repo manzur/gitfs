@@ -15,7 +15,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-int2string, bufsha1, save2file, string2path, sha2string, SHALEN: import utils;
+int2string, bufsha1, save2file, string2path, sha2string, SHALEN, INDEXPATH: import utils;
 
 include "gitindex.m";
 	gitindex: Gitindex;
@@ -29,7 +29,6 @@ Writetree: module
 {
 	init: fn(nil: ref Draw->Context, args: list of string);
 };
-
 
 init(nil: ref Draw->Context, args: list of string)
 {
@@ -49,8 +48,7 @@ writetreefile(): string
 {
 	
 	index := Index.new();
-	index.readindex("index");
-
+	index.readindex(INDEXPATH);
 
 	filelist := array[0] of byte;
 	for(l := mergesort(index.entries.all()); l != nil; l = tl l)

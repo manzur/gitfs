@@ -1,0 +1,5 @@
+#!/dis/sh
+
+echo compiling;
+limbo -g indexparser.b;
+echo compiled;
