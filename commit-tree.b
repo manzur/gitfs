@@ -29,6 +29,9 @@ chomp, readline, int2string, sha2string: import utils;
 include "daytime.m";
 	daytime: Daytime;
 
+include "env.m";
+	env: Env;
+
 stderr: ref Sys->FD;
 
 Committree: module
@@ -47,6 +50,7 @@ init(nil: ref Draw->Context, args: list of string)
 	bufio = load Bufio Bufio->PATH;
 	tables = load Tables Tables->PATH;
 	daytime = load Daytime Daytime->PATH;
+	env = load Env Env->PATH;
 
 	stderr = sys->fildes(2);
 
@@ -101,15 +105,23 @@ commit(treesha: string, parents: list of string): string
 	}
 	config: ref Strhash[ref Config];
 	config = utils->getuserinfo();
-	name := (config.find("user")).val;
-	email := (config.find("email")).val; 
+	authorname := env->getenv("AUTHOR_NAME");
+	authoremail := env->getenv("AUTHOR_EMAIL");
+	authordate := env->getenv("AUTHOR_DATE");
+	
+	if(authorname == "" || authoremail == ""){
+		(authorname, authoremail) = getpersoninfo("author");	
+	}
 
-	(comname, comemail) := getcommitterinfo();
+	(comname, comemail) := getpersoninfo("committer");
 	date := daytime->time();
 
-	commitmsg += "author " + name + " " + email + " " + date + "\n";
-	commitmsg += "committer " + comname + " " + comemail + " " + date + "\n\n";
-	
+	if(authordate == "")
+		authordate = date;
+
+	commitmsg += "author " + authorname + " <" + authoremail + "> " + authordate + "\n";
+	commitmsg += "committer " + comname + " <" + comemail + "> " + date + "\n\n";
+
 	commitmsg += getcomment();
 
 	commitlen := int2string(len commitmsg);
@@ -120,7 +132,7 @@ commit(treesha: string, parents: list of string): string
 	buf[7 + len commitlen] = byte 0;
 	buf[7 + len commitlen + 1:] = array of byte commitmsg;
 
-	sys->print("Commitmsg: %s\n", commitmsg);
+	sys->print("Commitmsg: %s", commitmsg);
 
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
@@ -135,15 +147,15 @@ commit(treesha: string, parents: list of string): string
 }
 
 
-getcommitterinfo(): (string, string)
+getpersoninfo(pos: string): (string, string)
 {
 
 	ibuf := bufio->fopen(sys->fildes(0), bufio->OREAD);
 	
-	sys->print("Enter commiter's name: ");
+	sys->print("Enter %s's name: ", pos);
 	name := readline(ibuf);	
 
-	sys->print("Enter committer's email: ");
+	sys->print("Enter %s's email: ", pos);
 	email := readline(ibuf);
 
 	return (name, email);

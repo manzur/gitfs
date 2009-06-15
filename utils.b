@@ -49,7 +49,7 @@ init()
 writesha1file(ch: chan of (int, array of byte))
 {
 
-	rqchan := deflate->start("z");
+	rqchan := deflate->start("z9");
 	old := array[0] of byte;
 
 	buf: array of byte;
@@ -90,10 +90,7 @@ readsha1file(shafilename: string): (string, int, array of byte)
 {
 	fd := sys->open(string2path(shafilename), Sys->OREAD);
 	if(fd == nil)
-	{
-		sys->fprint(stderr, "file not found: %r\n");
 		return ("", 0, nil);
-	}
 
 	rqchan := inflate->start("z");
 	old := array[0] of byte;
@@ -351,4 +348,20 @@ equalshas(sha1, sha2: array of byte): int
 			return 0;
 	}
 	return 1;
+}
+
+fail(s: string)
+{
+	warn(s);
+	exit;
+}
+
+warn(s: string)
+{
+	sys->fprint(sys->fildes(2), "%s\n", s);
+}
+
+isdir(mode: int): int
+{
+	return mode & 16384;
 }

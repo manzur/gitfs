@@ -47,6 +47,11 @@ Utils: module
 
 	readline:      fn(ibuf: ref Iobuf): string;
 
+	fail:	       fn(s: string);
+	warn: 	       fn(s: string);
+
+	isdir:         fn(mode: int): int;
+
 };
 
 

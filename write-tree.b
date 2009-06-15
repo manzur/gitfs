@@ -25,10 +25,17 @@ Index, Entry: import gitindex;
 include "filter.m";
 	deflate: Filter;
 
+include "string.m";
+	stringmodule: String;
+
 Writetree: module
 {
 	init: fn(nil: ref Draw->Context, args: list of string);
 };
+
+index: ref Index;
+
+outfd: ref Sys->FD;
 
 init(nil: ref Draw->Context, args: list of string)
 {
@@ -36,50 +43,85 @@ init(nil: ref Draw->Context, args: list of string)
 	deflate = load Filter Filter->DEFLATEPATH;
 	tables = load Tables Tables->PATH;
 	utils = load Utils Utils->PATH;
+	stringmodule = load String String->PATH;
 
 	utils->init();
 	deflate->init();
 	gitindex = load Gitindex Gitindex->PATH;
-	sys->print("new tree: %s\n", writetreefile());
+	outfd = sys->create("output", Sys->OWRITE, 8r644);
+	sys->print("new tree: %s\n", writetree());
 }
 
-
-writetreefile(): string
+writetree(): string
 {
-	
-	index := Index.new();
+	index = Index.new();
 	index.readindex(INDEXPATH);
 
-	filelist := array[0] of byte;
-	for(l := mergesort(index.entries.all()); l != nil; l = tl l)
+	l := mergesort(index.entries.all());
+	sys->print("files:\n");
+	l1 := l;
+	while(l1 != nil)
 	{
-		#F***ing zero; There's no way to write 0 byte except converting list to the array of byte
-		#Don't blame me for this stupid code
+		sys->print("file: %s\n", (hd l1).name);
+		l1 = tl l1;
+	}
+	return sha2string(writetreefile(l, "").t0);
+}
 
-		entry := hd l;
-		entry.mode = fillmode(entry.mode);
-		sys->print("Writing: %s; mode: %d\n", entry.name, entry.mode);
-		temp := array of byte sys->sprint("%o %s", entry.mode, entry.name);
-		oldfilelist := filelist;
-		filelist = array[len oldfilelist + len temp + 1 + SHALEN] of byte;
-		filelist[:] = oldfilelist;
-		offset := len oldfilelist;
+writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, list of ref Entry)
+{
+	offset := 0;
+	filelist := array[Sys->ATOMICIO] of byte;
+	while(entrylist != nil)
+	{
+		sys->print("in while\n");
+		entry := hd entrylist;
+		if(len basename >= len entry.name || !stringmodule->prefix(basename, entry.name))
+			break;
+
+		mode := entry.mode;
+		sha1 := entry.sha1;
+		name := entry.name;
+		rest: string;
+		sys->print("name is: %s; mode is %d; sha1 is %s\n", name,mode,sha2string(sha1));
+		(name, rest) = stringmodule->splitl(name[len basename:], "/");
+		mode |= 32768;
+		if(rest != "")
+		{
+			sys->print("in if\n");
+			(sha1, entrylist) = writetreefile(entrylist, basename + name + "/");
+			mode &= 1023;
+			mode = mode | 16384;
+
+		}
+		record := array of byte sys->sprint("%o %s", mode, name);
+		sys->write(sys->fildes(1), record, len record);
+		temp := array[len record + 1 + SHALEN] of byte;
+		temp[:] = record;
+		temp[len record] = byte 0;
+		temp[len record + 1:] = sha1;
+		if(len temp + offset >= len filelist)
+		{
+			oldfilelist := filelist;
+			filelist = array[len oldfilelist * 2] of byte;
+			filelist[:] = oldfilelist;
+		}
 		filelist[offset:] = temp;
 		offset += len temp;
-		filelist[offset] = byte 0;
-		filelist[offset+1:] = entry.sha1;
+		sys->print("mode is %o\n", mode);
+		if(entrylist != nil)
+			entrylist = tl entrylist;
 	}
-	fsize := len array of byte filelist;
 
-	header := sys->sprint("tree %d", fsize );
+	sys->print("size is: %d\n", offset);
+	header := sys->sprint("tree %d", offset);
 	headerlen := len array of byte header;
 
 	#+1 is for 0 byte,which is used as a separator
-	buf := array[len header + len filelist + 1] of byte;
+	buf := array[headerlen + offset + 1] of byte;
 	buf[:] = array of byte header;
 	buf[headerlen] = byte 0;
-	buf[headerlen + 1:] = filelist;
-
+	buf[headerlen + 1:] = filelist[:offset];
 
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
@@ -89,15 +131,19 @@ writetreefile(): string
 	ch <-= (0, buf);
 	(sz, sha) = <-ch;
 	
-	return sha2string(sha);
+	return (sha, entrylist);
 }
 
 #used for compatibility with unix mode
 fillmode(mode: int): int
 {
-	mode &= 1023;
-	mode |= 16384;
-	return mode;
+	if(mode & Sys->DMDIR)
+	{
+		mode &= 1023;
+		mode |= 16384;
+		return mode;
+	}
+	return mode & 1023;
 }
 
 mergesort(l: list of ref Entry): list of ref Entry

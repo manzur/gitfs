@@ -30,10 +30,7 @@ init(nil: ref Draw->Context, args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	if(len args < 2)
-	{
 		usage();
-		return;
-	}
 	utils = load Utils Utils->PATH;
 	arg   = load Arg Arg->PATH;
 	utils->init();
@@ -68,6 +65,6 @@ catfile(path: string)
 usage()
 {
 	sys->fprint(sys->fildes(2), "usage: cat-file <sha1>");
-	return;
+	exit;
 }
 

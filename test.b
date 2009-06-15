@@ -25,8 +25,16 @@ include "lists.m";
 include "readdir.m";
 	readdir: Readdir;
 	
+include "filepat.m";
+	filepath: Filepat;
+
+include "exclude.m";
+	exclude: Exclude;
+
 
 print : import sys;
+
+global: int;
 
 Mymodule : module
 {
@@ -78,6 +86,8 @@ init(nil : ref Draw->Context, args : list of string)
 	sys = load Sys Sys->PATH;
 	tables = load Tables Tables->PATH;
 	readdir = load Readdir Readdir->PATH;
+	filepat := load Filepat Filepat->PATH;
+	exclude  = load Exclude Exclude->PATH;
 
 	mytable : ref Strhash[ref Someadt];
 	mytable = Strhash[ref Someadt].new(5, nil);
@@ -85,26 +95,22 @@ init(nil : ref Draw->Context, args : list of string)
 	utils = load Utils Utils->PATH;
 	utils->init();
 	
+	sys->print("global: %d\n","a" > "b");
 	lists = load Lists Lists->PATH;
-	l1 := list of {"a", "b", "c"};
+	l1 := list of {ref Someadt("a", 12), ref Someadt("b", 13)};
+	testlist(l1);
+	sys->print("%s => %d\n", (hd (tl l1)). name, (hd (tl l1)).age);
 
-	l1 = lists->reverse(l1);
+}
 
-	(ret, dirstat) := sys->stat(hd tl args);
-
-	if(!ret && (dirstat.mode & Sys->DMDIR))
-	{
-		(dirs, cnt) := readdir->init(hd tl args, Readdir->NAME);
-		for(i := 0; i < cnt; i++)
-		{
-			sys->print("%s\n", dirs[i].name);
-		}
+testlist(l: list of ref Someadt)
+{
+	r := l;
+	while(r != nil){
+		if((hd r).name == "b")
+			(hd r).age = 14;
+		r = tl r;
 	}
-	else
-	{
-		sys->print("not dir\n");
-	}
-
 }
 
 output()
@@ -257,3 +263,9 @@ reverse(l: list of int): list of int
 	return l1;
 }
 
+
+usage()
+{
+	sys->fprint(sys->fildes(2),"sadasd");
+	exit;
+}

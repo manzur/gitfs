@@ -10,6 +10,10 @@ include "tables.m";
 
 Strhash: import tables;
 
+include "bufio.m";
+	bufio: Bufio;
+Iobuf: import bufio;
+	
 include "utils.m";
 	utils: Utils;
 

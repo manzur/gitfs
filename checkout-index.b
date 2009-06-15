@@ -48,7 +48,7 @@ init(nil: ref Draw->Context, args: list of string)
 	if(!index.readindex(INDEXPATH))
 	{
 		sys->fprint(stderr, "index read error\n");
-		return;
+		exit;
 	}
 	
 	arg->init(args);

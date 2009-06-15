@@ -9,20 +9,20 @@ include "bufio.m";
 	bufio: Bufio;
 Iobuf: import bufio;
 
-include "regex.m";
-	regex: Regex;
-Re: import regex;
-	
-regexp: Re;
+include "filepat.m";
+	filepat: Filepat;
 
 stderr: ref Sys->FD;
-excluderegexp: list of Re = nil;
+
+#int is flag for pattern negation: 0 for normal pattern; 1 is for negated
+#where string is pattern
+patterns: list of (int, string) = nil;
 
 init()
 {
 	sys = load Sys Sys->PATH;
 	bufio = load Bufio Bufio->PATH;
-	regex = load Regex Regex->PATH;
+	filepat = load Filepat Filepat->PATH;
 	stderr = sys->fildes(2);
 	ibuf := bufio->open(EXCLUDEPATH, Bufio->OREAD);
 	if(ibuf == nil)
@@ -32,30 +32,31 @@ init()
 	}
 	while((s := ibuf.gets('\n')) != "")
 	{
-		s = s[:len s - 1];
-		(regexp, diag) := regex->compile(s,0);
-		if(regexp == nil)
+		negated := 0;
+		if(s[0] == '#' || s[0] == '\n') continue;
+		if(s[0] == '!') 
 		{
-			sys->fprint(stderr, "error in regexp(%s): %s\n", s, diag);
-			continue;
+			negated = 1;
+			s = s[1:];
 		}
-		excluderegexp = regexp :: excluderegexp;
+		s = s[:len s - 1];
+		if(s[len s - 1] == '/')
+			s[len s] = '*';
+		patterns = (negated, s) :: patterns; 
 	}
 }
 
 excluded(path: string): int
 {
-	for(l := excluderegexp; l != nil; l = tl l)
+	ret := 0;
+	for(l := patterns; l != nil; l = tl l)
 	{
-		a := regex->execute(hd l, path);	
-		if(a != nil && a[0].t0 >= 0)
-			return 1;
+		elem := hd l;
+		if(!elem.t0 && filepat->match(elem.t1, path))
+			ret = 1;
+		else if(elem.t0 && filepat->match(elem.t1, path))
+			ret = 0;
 	}
-	return 0;
+	return ret;
 }
-
-
-
-
-
 

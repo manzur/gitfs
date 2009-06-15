@@ -24,10 +24,9 @@ init(nil: ref Draw->Context, args: list of string)
 	daytime = load Daytime Daytime->PATH;
 	inflate->init();
 	deflate->init();
-	sys->print("--%d--\n",daytime->now());
-	sys->print("--%s--\n",daytime->time());
 	path1 := "text";
-	path2 := "objects/f9/338121f61abecfe310b5f68d1893389193479d";
+#	path2 := ".dircache/objects/e9/6397bb67445e914bb2f94ec69772b7132f490f";
+	path2 := "objects/7f/bdd05afbc542a21b4021b18993ad20e950b91e";
 #	deflatefile(path1);
 	inflatefile(path2);
 #	modetest("objects");
@@ -36,17 +35,14 @@ init(nil: ref Draw->Context, args: list of string)
 
 modetest(path: string)
 {
-	sys->print("in modetest\n");
 	(ret, dirstat) := sys->stat(path);
 	if(ret == -1)
 	{
 		sys->print("stat error: %r\n");
 		return;
 	}
-	sys->print("%d\n", dirstat.mode >> 31);
 	if(dirstat.mode >> 31 == -1)
 		sys->print("dir\n");
-	sys->print("out modetest\n");
 }
 #48f44c752605481273d1cb92185ff3e09ddd00b8
 
@@ -60,7 +56,6 @@ deflatefile(path: string)
 	{
 		pick rq := <-rqchan
 		{
-			Start => sys->print("Started: %d\n", rq.pid);
 			Finished => if(len rq.buf > 0) sys->print("Data remained\n");
 				    return save2file(path, old);
 
@@ -97,16 +92,13 @@ save2file(path: string, buf: array of byte)
 inflatefile(path: string)
 {
 	fd := sys->open(path, Sys->OREAD);
-	sys->print("in inflate: %r\n");
 	if(fd == nil) return;
-	sys->print("after if\n");
 	rqchan := inflate->start("z");
 	old := array[0] of byte;
 	while(1)
 	{
 		pick rq := <-rqchan
 		{
-			Start => sys->print("Started: %d\n", rq.pid);
 			Finished => if(len rq.buf > 0) sys->print("Data remained\n");
 				    sys->write(sys->fildes(1), old, len old);
 				    return;
@@ -125,7 +117,6 @@ inflatefile(path: string)
 			Error =>
 				if(fd == nil)
 					sys->print("---+++\n");
-				sys->print("%s\n",rq.e);
 				return;
 		}
 	}

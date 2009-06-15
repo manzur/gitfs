@@ -25,6 +25,8 @@ include "string.m";
 	stringmodule: String;
 splitl: import stringmodule;	
 
+index: ref Index;
+
 Readtree: module
 {
 	init: fn(nil: ref Draw->Context, args: list of string);
@@ -50,28 +52,49 @@ init(nil: ref Draw->Context, args: list of string)
 
 readtree(path: string)
 {
+	index = Index.new();
+	readtreefile(path, "");
+	index.writeindex(INDEXPATH);
+}
+
+readtreefile(path: string, basename: string)
+{
 	(filetype, filesize, buf) := readsha1file(path);
-	index := Index.new();
 
 	ibuf := bufio->aopen(buf);
 	while((s := ibuf.gets('\0')) != "")
 	{
-		(mode, filepath) := splitl(s, " ");
+		(modestr, filepath) := splitl(s, " ");
+		mode := stringmodule->toint(modestr,10).t0;
+		if(isdir(mode))
+		{
+			sha1 := array[SHALEN] of byte;
+			ibuf.read(sha1, SHALEN);
+			readtreefile(sha2string(sha1), basename + filepath + "/");	
+			continue;
+		}
 		entry := Entry.new();
-		entry.mode = stringmodule->toint(mode,10).t0;
-		entry.namelen = len filepath;
-		entry.name = filepath;
+		entry.mode = mode;
+		entry.namelen = len basename + len filepath;
+		entry.name = basename + filepath;
 		ibuf.read(entry.sha1, SHALEN);
-#FIXME: make better solution to find length of the file
+
+#FIXME: find better solution to find length of the file
 		(filetype, filesize, buf) := readsha1file(sha2string(entry.sha1));
 		entry.length = big len buf;
 		index.addentry(entry);
 	}
-	index.writeindex(INDEXPATH);
 }
+
+
 
 usage()
 {
 	sys->fprint(sys->fildes(2), "usage: read-tree <tree-sha>\n");
+	exit;
 }
 
+isdir(mode: int): int
+{
+	return mode & 16384;
+}
