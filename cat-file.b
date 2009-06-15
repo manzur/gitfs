@@ -40,7 +40,6 @@ init(nil: ref Draw->Context, args: list of string)
 		case c
 		{
 			't' => printtypeonly = 1;
-				sys->print("cattt\n");
 			* => usage();return;
 		}
 	}
