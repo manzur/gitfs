@@ -2,7 +2,7 @@
 
 Gitindex : module
 {
-	PATH: con "gitindex.dis";
+	PATH: con "/dis/git/gitindex.dis";
 	CACHESIGNATURE: con 16r44495243;
 
 	HEADERSZ: con 32;
@@ -53,7 +53,7 @@ Gitindex : module
 		rmfile:     fn(index: self ref Index, path: string);
 		readindex:  fn(index: self ref Index, path: string): int;
 		writeindex: fn(index: self ref Index, path: string): int;
-		new:        fn(): ref Index;
+		new:        fn(repopath: string): ref Index;
 	};
 	
 		

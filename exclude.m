@@ -1,9 +1,9 @@
 
 Exclude: module
 {
-	PATH: con "exclude.dis";
+	PATH: con "/dis/git/exclude.dis";
 	EXCLUDEPATH: con "exclude";
-	init: fn();
+	init: fn(args: list of string);
 	excluded: fn(path: string): int;	
 
 };

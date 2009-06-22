@@ -1,9 +1,9 @@
 implement Writetree;
 
+include "write-tree.m";
+
 include "sys.m";
 	sys: Sys;
-
-include "draw.m";
 
 include "tables.m";
 	tables: Tables;
@@ -28,16 +28,12 @@ include "filter.m";
 include "string.m";
 	stringmodule: String;
 
-Writetree: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
-
 index: ref Index;
+REPOPATH: string;
 
 outfd: ref Sys->FD;
 
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	deflate = load Filter Filter->DEFLATEPATH;
@@ -45,7 +41,8 @@ init(nil: ref Draw->Context, args: list of string)
 	utils = load Utils Utils->PATH;
 	stringmodule = load String String->PATH;
 
-	utils->init();
+	REPOPATH = hd args;
+	utils->init(REPOPATH);
 	deflate->init();
 	gitindex = load Gitindex Gitindex->PATH;
 	outfd = sys->create("output", Sys->OWRITE, 8r644);
@@ -54,7 +51,7 @@ init(nil: ref Draw->Context, args: list of string)
 
 writetree(): string
 {
-	index = Index.new();
+	index = Index.new(REPOPATH);
 	index.readindex(INDEXPATH);
 
 	l := mergesort(index.entries.all());
@@ -74,7 +71,6 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	filelist := array[Sys->ATOMICIO] of byte;
 	while(entrylist != nil)
 	{
-		sys->print("in while\n");
 		entry := hd entrylist;
 		if(len basename >= len entry.name || !stringmodule->prefix(basename, entry.name))
 			break;
@@ -88,7 +84,6 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 		mode |= 32768;
 		if(rest != "")
 		{
-			sys->print("in if\n");
 			(sha1, entrylist) = writetreefile(entrylist, basename + name + "/");
 			mode &= 1023;
 			mode = mode | 16384;
@@ -150,7 +145,6 @@ mergesort(l: list of ref Entry): list of ref Entry
 {
 	if(len l > 1)
 	{
-		sys->print("in mergesort: %d\n", len l);
 		middle := len l / 2;
 		(l1, l2) := partitionbypos(l, middle);
 		l1 = mergesort(l1);

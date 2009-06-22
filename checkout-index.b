@@ -1,9 +1,9 @@
 implement Checkoutindex;
 
+include "checkout-index.m";
+
 include "sys.m";
 	sys: Sys;
-
-include "draw.m";	
 
 include "tables.m";
 	tables: Tables;
@@ -24,28 +24,26 @@ INDEXPATH, sha2string,string2path, readsha1file: import utils;
 include "arg.m";
 	arg: Arg;
 
-Checkoutindex: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
-
-
 index: ref Index;
 stderr: ref Sys->FD;
 all: int = 0;
 force: int = 0;
+REPOPATH: string;
 
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	arg = load Arg Arg->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	tables = load Tables Tables->PATH;
 	utils = load Utils Utils->PATH;
-	utils->init();
-	index = Index.new();
+
+	REPOPATH = hd args;
+	args = tl args;
+	utils->init(REPOPATH);
+	index = Index.new(REPOPATH);
 	stderr = sys->fildes(2);
-	if(!index.readindex(INDEXPATH))
+	if(!index.readindex(REPOPATH + INDEXPATH))
 	{
 		sys->fprint(stderr, "index read error\n");
 		exit;
@@ -77,29 +75,25 @@ init(nil: ref Draw->Context, args: list of string)
 
 checkoutfile(path: string)
 {
+	fullpath := REPOPATH + path;
 	entry := index.entries.find(path);
-	if(entry == nil)
-	{
+	if(entry == nil){
 		sys->print("No such file: %s\n", path);
 		return;
 	}
 	#if file exists and force flag is off
-	if(!force && sys->open(path, Sys->OREAD) != nil)
-	{
+	if(!force && sys->open(fullpath, Sys->OREAD) != nil){
 		sys->fprint(stderr, "file(%s) exists\n", path);
 		return;
 	}
-	fd := sys->create(path, Sys->OWRITE, 8r644);
-	if(fd == nil)
-	{
-		makedirs(dirname(path));
-		fd = sys->create(path,Sys->OWRITE, 8r644);
-		if(fd == nil)
-		{
+	fd := sys->create(fullpath, Sys->OWRITE, 8r644);
+	if(fd == nil){
+		makedirs(dirname(fullpath));
+		fd = sys->create(fullpath, Sys->OWRITE, 8r644);
+		if(fd == nil){
 			sys->fprint(stderr, "file(%s) couldn't be created\n", path);
 			return;
 		}
-
 	}
 	checkoutentry(fd, entry);
 }
@@ -108,15 +102,13 @@ checkoutentry(fd: ref Sys->FD, entry: ref Entry)
 {
 	(filetype, filesize, buf) := readsha1file(sha2string(entry.sha1));
 	sys->print("filetype: %s; filesize: %d\n", filetype, filesize);
-	if(sys->write(fd, buf, len buf) != len buf)
-	{
+	if(sys->write(fd, buf, len buf) != len buf){
 		sys->fprint(stderr, "error occured while writing to file: %r\n");
 		return;
 	}
 	dirstat := sys->nulldir;
 	dirstat.mode = entry.mode & 1023;
-	if(sys->fwstat(fd, dirstat))
-	{
+	if(sys->fwstat(fd, dirstat)){
 		sys->fprint(stderr, "stat can't be changed: %r\n");
 		return;
 	}
@@ -126,19 +118,14 @@ checkoutentry(fd: ref Sys->FD, entry: ref Entry)
 checkoutall()
 {
 	for(l := index.entries.all(); l != nil; l = tl l)
-	{
 		checkoutfile((hd l).name);
-	}
 }
 
 dirname(path: string): string
 {
-	for(i := len path - 1; i >= 0; i--)
-	{
+	for(i := len path - 1; i >= 0; i--){
 		if(path[i] == '/')
-		{
 			return path[0:i];
-		}
 	}
 	return ".";
 }
@@ -146,9 +133,7 @@ dirname(path: string): string
 makedirs(path: string)
 {
 	if(!exists(path))
-	{
 		makedirs(dirname(path));
-	}
 	sys->create(path, Sys->OREAD,  Sys->DMDIR|8r755);
 }
 

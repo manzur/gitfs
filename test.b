@@ -1,12 +1,14 @@
 implement Mymodule;
 
+
 include "sys.m";
 	sys : Sys;
 
 include "tables.m";
 	tables : Tables;
 
-Strhash : import tables;
+Strhash, Table : import tables;
+
 
 include "draw.m";
 include "bufio.m";
@@ -64,6 +66,7 @@ Cmp[T].cmp(t1, t2: T): int
 	return 0;
 }
 
+
 Someadt.print(someadt : self Someadt)
 {
 	print("Name : %s\n", someadt.name);
@@ -77,9 +80,27 @@ strchr(s: string, ch: int): int
 		if(s[i] == ch)
 			return i;
 	}
+
 	return -1;
 
 }
+
+include "test1.m";
+	test1: Test1;
+
+include "arg.m";
+	arg: Arg;
+
+DD: adt{
+	i: big;
+	d: ref Sys->Dir;
+};
+
+DD1: adt{
+	i: big;
+	d: ref Sys->Dir;
+	pl:  cyclic array of ref DD;
+};
 
 init(nil : ref Draw->Context, args : list of string)
 {
@@ -89,18 +110,9 @@ init(nil : ref Draw->Context, args : list of string)
 	filepat := load Filepat Filepat->PATH;
 	exclude  = load Exclude Exclude->PATH;
 
-	mytable : ref Strhash[ref Someadt];
-	mytable = Strhash[ref Someadt].new(5, nil);
-
-	utils = load Utils Utils->PATH;
-	utils->init();
-	
-	sys->print("global: %d\n","a" > "b");
-	lists = load Lists Lists->PATH;
-	l1 := list of {ref Someadt("a", 12), ref Someadt("b", 13)};
-	testlist(l1);
-	sys->print("%s => %d\n", (hd (tl l1)). name, (hd (tl l1)).age);
-
+	sys->print("from makefileisaidisaid\n");
+	table := Table[ref DD].new(13, nil);
+	sys->print("%bd;%bd", big string big 15, big 15);
 }
 
 testlist(l: list of ref Someadt)
@@ -155,7 +167,7 @@ commucate(ch: chan of array of byte)
 		count++;
 		sys->print("\n<===%s===>\n", string b);
 		sys->write(sys->fildes(1), b, len b);
-		sys->print("from comm\n");
+		sys->print("from+++ comm\n");
 		ch <-= array[1] of {byte 0};
 	}
 }

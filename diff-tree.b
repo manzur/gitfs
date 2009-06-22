@@ -1,11 +1,11 @@
 implement Difftree;
 
+include "diff-tree.m";
+
 include "sys.m";
 	sys: Sys;
 include "arg.m";
 	arg: Arg;
-
-include "draw.m";
 
 include "tables.m";
 Strhash: import Tables;
@@ -28,20 +28,18 @@ Entry: import gitindex;
 recursive: int;
 
 stderr: ref Sys->FD;
+REPOPATH: string;
 
-Difftree: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
-
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 	bufio = load Bufio Bufio->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	stringmodule = load String String->PATH;
-	utils->init();
+
+	REPOPATH = hd args;
+	utils->init(REPOPATH);
 
 	stderr = sys->fildes(2);
 

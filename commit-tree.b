@@ -1,9 +1,9 @@
 implement Committree;
 
+include "commit-tree.m";
+
 include "sys.m";
 	sys: Sys;
-
-include "draw.m";
 
 include "arg.m";
 	arg: Arg;
@@ -33,15 +33,10 @@ include "env.m";
 	env: Env;
 
 stderr: ref Sys->FD;
-
-Committree: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
+REPOPATH: string;
 
 
-
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	arg = load Arg Arg->PATH;
@@ -57,11 +52,14 @@ init(nil: ref Draw->Context, args: list of string)
 	if(len args < 2)
 	{
 		usage();
-		return;
+		exit;
 	}
+
+	REPOPATH = hd args;
+	args = tl args;
 	
 	arg->init(args);
-	utils->init();
+	utils->init(REPOPATH);
 	deflate->init();
 
 	parents: list of string = nil;
@@ -82,24 +80,21 @@ init(nil: ref Draw->Context, args: list of string)
 
 commit(treesha: string, parents: list of string): string
 {
-	if(!utils->exists(treesha))
-	{
+	if(!utils->exists(treesha)){
 		sys->fprint(stderr, "no such tree file\n");
 		return "";
 	}
 
-	for(l := parents; l != nil; l = tl l)
-	{
+	for(l := parents; l != nil; l = tl l){
 		if(!utils->exists(hd l)){
 			sys->fprint(stderr, "no such sha file: %s\n", hd l);
 			return "";
 		}
-
 	}
+
 	commitmsg := "";
 	commitmsg += "tree " + treesha + "\n";
-	while(parents != nil)
-	{
+	while(parents != nil){
 		commitmsg += "parent " + (hd parents) + "\n";
 		parents = tl parents;
 	}
@@ -128,7 +123,7 @@ commit(treesha: string, parents: list of string): string
 	#6 - "commit", 1 - " ", 1 - '\0'
 	buf := array[6 + 1 + len commitlen + 1 + len commitmsg] of byte;
 
-	buf[:] = array of byte ("commit " + int2string(len commitmsg));
+	buf[:] = sys->aprint("commit %d", len commitmsg);
 	buf[7 + len commitlen] = byte 0;
 	buf[7 + len commitlen + 1:] = array of byte commitmsg;
 
@@ -142,8 +137,9 @@ commit(treesha: string, parents: list of string): string
 	ch <-= (0, buf);
 	(sz, sha) = <-ch;
 
+	fd := sys->open(REPOPATH + "head", Sys->OWRITE);
+	sys->fprint(fd, "%s", treesha);
 	return sha2string(sha);
-
 }
 
 

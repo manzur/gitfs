@@ -13,18 +13,20 @@ include "filepat.m";
 	filepat: Filepat;
 
 stderr: ref Sys->FD;
+REPOPATH: string;
 
 #int is flag for pattern negation: 0 for normal pattern; 1 is for negated
 #where string is pattern
 patterns: list of (int, string) = nil;
 
-init()
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	bufio = load Bufio Bufio->PATH;
 	filepat = load Filepat Filepat->PATH;
 	stderr = sys->fildes(2);
-	ibuf := bufio->open(EXCLUDEPATH, Bufio->OREAD);
+	REPOPATH = hd args;
+	ibuf := bufio->open(REPOPATH + EXCLUDEPATH, Bufio->OREAD);
 	if(ibuf == nil)
 	{
 		sys->fprint(stderr, "excude file couldn't be found\n");

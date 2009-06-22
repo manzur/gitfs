@@ -1,9 +1,9 @@
 implement Checkrepo;
 
+include "checkrepo.m";
+
 include "sys.m";
 	sys: Sys;
-
-include "draw.m";
 
 include "tables.m";
 Strhash: import Tables;
@@ -16,17 +16,11 @@ include "utils.m";
 	utils: Utils;
 SHALEN, readsha1file, isdir, sha2string, OBJECTSTOREPATH: import utils;
 
-
 include "readdir.m";
 	readdir: Readdir;
 
 include "string.m";
 	stringmodule: String;
-
-Checkrepo: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
 
 Object: adt
 {
@@ -44,15 +38,18 @@ objects := array[HASHSZ] of list of ref Object;
 
 checkvalidness: int;
 stderr: ref Sys->FD;
+REPOPATH: string;
 
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 	bufio = load Bufio Bufio->PATH;
 	readdir = load Readdir Readdir->PATH;
 	stringmodule = load String String->PATH;
-	utils->init();
+
+	REPOPATH = hd args;
+	utils->init(REPOPATH);
 	stderr = sys->fildes(2);
 	check();
 }
@@ -62,7 +59,6 @@ check()
 	readrepo(OBJECTSTOREPATH);
 
 	cnt := 0;
-
 	for(i := 0; i < HASHSZ; i++){
 		cnt += len objects[i];
 		for(l := objects[i]; l != nil; l = tl l){

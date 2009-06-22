@@ -1,5 +1,7 @@
 implement Initgit;
 
+include "init.m";
+
 include "sys.m";
 
 include "draw.m";
@@ -21,14 +23,9 @@ include "utils.m";
 INDEXPATH, OBJECTSTOREPATH, SHALEN: import Utils;
 
 
+REPOPATH: string;
 
-Initgit: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
-
-
-init(nil: ref Draw->Context, args: list of string)
+init(args: list of string)
 {
 	sys := load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
@@ -36,16 +33,17 @@ init(nil: ref Draw->Context, args: list of string)
 
 	stderr := sys->fildes(2);
 
+	REPOPATH = hd args;
 	sys->print("Initializing git repo\n");
 
-	Index.new();
+	Index.new(REPOPATH);
 
 	header := Header.new();
 	temp := header.unpack()[:HEADERSZ - SHALEN];
 	
 	keyring->sha1(temp, len temp, header.sha1, nil);
 	
-	if((fd := sys->create(INDEXPATH, Sys->OWRITE, 8r644)) == nil ||
+	if((fd := sys->create(REPOPATH + INDEXPATH, Sys->OWRITE, 8r644)) == nil ||
 	   sys->write(fd, temp, len temp) != len temp ||
 	   sys->write(fd, header.sha1, SHALEN) != SHALEN)
 	{
@@ -53,7 +51,7 @@ init(nil: ref Draw->Context, args: list of string)
 		return;
 	}
 
-	if(sys->create(OBJECTSTOREPATH, Sys->OREAD, Sys->DMDIR | 8r700) == nil)
+	if(sys->create(REPOPATH + OBJECTSTOREPATH, Sys->OREAD, Sys->DMDIR | 8r700) == nil)
 	{
 		sys->fprint(stderr, "objects dir couldn't be created: %r\n");
 		return;
@@ -61,7 +59,7 @@ init(nil: ref Draw->Context, args: list of string)
 
 	for(i := 0; i <= 255; i++)
 	{
-		dirname := sys->sprint("objects/%02x", i);
+		dirname := sys->sprint("%sobjects/%02x", REPOPATH, i);
 		dirfd := sys->create(dirname,Sys->OREAD,sys->DMDIR | 8r700);
 		if(dirfd == nil)
 			sys->fprint(stderr, "directory %s/%s couldn't be created: %r\n", OBJECTSTOREPATH, dirname);

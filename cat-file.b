@@ -3,8 +3,6 @@ implement Catfile;
 include "sys.m";
 	sys: Sys;
 
-include "draw.m";
-
 include "tables.m";
 	tables: Tables;
 Strhash: import tables;	
@@ -16,49 +14,36 @@ Iobuf: import bufio;
 include "utils.m";
 	utils: Utils;
 	
-include "arg.m";
-	arg: Arg;
+include "cat-file.m";
 
-Catfile: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
-
+msgchan: chan of array of byte;
 printtypeonly := 0;
+REPOPATH: string;
 
-init(nil: ref Draw->Context, args: list of string)
+init(repopath: string, typeonly: int, path: string, ch: chan of array of byte)
 {
 	sys = load Sys Sys->PATH;
-	if(len args < 2)
-		usage();
 	utils = load Utils Utils->PATH;
-	arg   = load Arg Arg->PATH;
-	utils->init();
-	arg->init(args);
-	while((c := arg->opt()) != 0)
-	{
-		case c
-		{
-			't' => printtypeonly = 1;
-			* => usage();return;
-		}
-	}
-	catfile(hd arg->argv());
-}
 
+	REPOPATH = repopath;
+	utils->init(repopath);
+       
+	printtypeonly = typeonly;
+	msgchan = ch;
+	catfile(path);
+}
 
 catfile(path: string)
 {
 	(filetype, filesize, buf) := utils->readsha1file(path);	
 	offset := 0;
-	sys->print("filetype: %s\n", filetype);
-	if(printtypeonly)
+
+	msgchan <-= sys->aprint("filetype: %s\n", filetype);
+	if(printtypeonly){
+		msgchan <-= nil;
 		return;
-	while(offset < len buf)
-	{
-		cnt := sys->write(sys->fildes(1), buf[offset:], len buf - offset);
-		offset += cnt;
 	}
+	msgchan <-= buf[offset:];
 }
 
 usage()

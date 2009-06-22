@@ -30,7 +30,9 @@ include "keyring.m";
 stderr : ref Sys->FD;
 filebuf: array of byte;
 
-Index.new(): ref Index
+REPOPATH: string;
+
+Index.new(repopath: string): ref Index
 {
 	tables = load Tables Tables->PATH;
 	sys = load Sys Sys->PATH;
@@ -38,8 +40,9 @@ Index.new(): ref Index
 	keyring = load Keyring Keyring->PATH;
 	exclude = load Exclude Exclude->PATH;
 
-	utils->init();
-	exclude->init();
+	REPOPATH = repopath;
+	utils->init(REPOPATH);
+	exclude->init(REPOPATH :: nil);
 	stderr = sys->fildes(2);
 
 	index: Index;
@@ -53,33 +56,29 @@ Index.new(): ref Index
 #FIXME: Use addentry
 Index.addfile(index: self ref Index, path : string) : int
 {
-	if(!verifypath(path))
-	{
+	if(!verifypath(REPOPATH + path)){
 		sys->fprint(stderr, "wrong path: %r\n");
 		return -1;
 	}
 	if(exclude->excluded(path)) return -1;
 
 	index.header.entriescnt++;
-	if(index.header.entriescnt * CLSBND >= index.hashcap)
-	{
+	if(index.header.entriescnt * CLSBND >= index.hashcap){
 		oldentries := index.entries.all();
 		index.hashcap = allocnr(index.hashcap);
 		index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
-		while(oldentries != nil)
-		{
+		while(oldentries != nil){
 			entry := hd oldentries;
 			index.entries.add(entry.name, entry);
 			oldentries = tl oldentries;
 		}
 	}
 
-	sha1 := writeblobfile(path);
+	sha1 := writeblobfile(REPOPATH + path);
 	entry := initentry(path);
 	entry.sha1 = sha1;
-	if((elem := index.entries.find(entry.name)) != nil)
-	{
+	if((elem := index.entries.find(entry.name)) != nil){
 		copyentry(elem, entry);
 		index.header.entriescnt--;
 	}
@@ -94,14 +93,12 @@ Index.addfile(index: self ref Index, path : string) : int
 Index.addentry(index: self ref Index, entry: ref Entry)
 {
 	index.header.entriescnt++;
-	if(index.header.entriescnt * CLSBND >= index.hashcap)
-	{
+	if(index.header.entriescnt * CLSBND >= index.hashcap){
 		oldentries := index.entries.all();
 		index.hashcap = allocnr(index.hashcap);
 		index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
-		while(oldentries != nil)
-		{
+		while(oldentries != nil){
 			entry := hd oldentries;
 			index.entries.add(entry.name, entry);
 			oldentries = tl oldentries;
@@ -124,11 +121,9 @@ writeblobfile(path: string): array of byte
 	buf[:] = temp;
 	buf[len temp] = byte 0;
 	cnt := len temp + 1;
-	while(1)
-	{
+	while(1){
 		ch <-= (cnt, buf);
-		if(cnt == 0)
-		{
+		if(cnt == 0){
 			(sz, sha1) = <-ch;
 			break;
 		}
@@ -139,8 +134,7 @@ writeblobfile(path: string): array of byte
 
 Index.rmfile(index: self ref Index, path : string) 
 {
-	if(index.entries.find(path) == nil)
-	{
+	if(index.entries.find(path) == nil){
 		sys->fprint(stderr, "there's no such file(%s) in the index\n", path);
 		return;
 	}
@@ -163,16 +157,14 @@ Index.readindex(index: self ref Index, path : string) : int
 {
 	indexfd := sys->open(path, Sys->OREAD);
 
-	if(indexfd == nil)
-	{
+	if(indexfd == nil){
 		sys->fprint(stderr,"file access error: %r\n");
 		return -1;
 	}
 
 	header := array[HEADERSZ] of byte;
 
-	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ)
-	{
+	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ){
 		sys->fprint(stderr, "Index format error: %r\n");
 		return -1;
 	}
@@ -193,14 +185,11 @@ Index.readindex(index: self ref Index, path : string) : int
 
 	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
-	for(i := 0; i < index.header.entriescnt; i++)
-	{
-
+	for(i := 0; i < index.header.entriescnt; i++){
 		entrybuf := array[ENTRYSZ] of byte;
 
 		ret := sys->read(indexfd, entrybuf, ENTRYSZ);
-		if(ret != ENTRYSZ)
-		{
+		if(ret != ENTRYSZ){
 			sys->fprint(stderr,"index file error: %r\n");
 			return 0;
 		}
@@ -223,8 +212,7 @@ Index.readindex(index: self ref Index, path : string) : int
 
 	sha1 := array[SHALEN] of byte;
 	keyring->sha1(temp, 0, sha1, state);
-	if(!verifyheader(index.header, sha1))
-	{
+	if(!verifyheader(index.header, sha1)){
 		sys->fprint(stderr, "header is not correct\n");
 		return -1;
 	}
@@ -235,8 +223,7 @@ Index.readindex(index: self ref Index, path : string) : int
 Index.writeindex(index: self ref Index, path : string) : int
 {
 	fd := sys->create(path, Sys->OWRITE, 8r644);
-	if(fd == nil)
-	{
+	if(fd == nil){
 		sys->fprint(stderr, "write index error: %r\n");
 		return 0;
 	}
@@ -251,8 +238,7 @@ Index.writeindex(index: self ref Index, path : string) : int
 	temp = int2bytes(index.header.entriescnt);
 	state = keyring->sha1(temp, len temp, nil, state);
 
-	for(l := index.entries.all(); l != nil; l = tl l)
-	{
+	for(l := index.entries.all(); l != nil; l = tl l){
 		temp = (hd l).unpack();
 		state = keyring->sha1(temp, len temp, nil, state);
 	}

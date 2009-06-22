@@ -27,12 +27,14 @@ include "tables.m";
 Strhash: import tables;
 
 
+REPOPATH: string;
+
 hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
 			"a","b","c", "d", "e", "f"};
 
 stderr: ref Sys->FD;
 
-init()
+init(repopath: string)
 {
 	sys = load Sys Sys->PATH;
 	keyring = load Keyring Keyring->PATH;
@@ -44,6 +46,7 @@ init()
 	inflate->init();
 	deflate->init();
 	stderr = sys->fildes(2);
+	REPOPATH = repopath;
 }
 
 writesha1file(ch: chan of (int, array of byte))
@@ -88,16 +91,18 @@ mainloop:
 
 readsha1file(shafilename: string): (string, int, array of byte)
 {
+	sys->print("in readshafile\n");
 	fd := sys->open(string2path(shafilename), Sys->OREAD);
-	if(fd == nil)
+	if(fd == nil){
+		sys->print("file not found\n");
 		return ("", 0, nil);
-
+	}
+	sys->print("after if\n");
 	rqchan := inflate->start("z");
 	old := array[0] of byte;
 
 mainloop:
-	while(1)
-	{
+	while(1){
 		pick rq := <-rqchan
 		{
 			Finished => if(len rq.buf > 0) 
@@ -123,29 +128,25 @@ mainloop:
 		}
 	}
 	
-		
-	for(i := 0; i < len old; i++)
-	{
+	for(i := 0; i < len old; i++){
 		if(old[i] == byte 0)
 			break;
 	}
 
-	if(i < 0 || i >= len old)
-	{
+	if(i < 0 || i >= len old){
 		sys->print("wrong file format\n");
 		return ("",0,nil);
 	}
 
 	pos := strchr(string old[:i], ' ');
 
+	sys->print("finishing readhs1\n");
 	return (string old[:pos], bytes2int(old, pos + 1), old[i+1:]);
-
 }
 
 strchr(s: string, ch: int): int
 {
-	for(i := 0; i < len s; i++)
-	{
+	for(i := 0; i < len s; i++){
 		if(s[i] == ch)
 			return i;
 	}
@@ -154,14 +155,13 @@ strchr(s: string, ch: int): int
 
 string2path(filename: string): string
 {
-	return "objects/" + filename[:2] + "/" + filename[2:];
+	return REPOPATH + "objects/" + filename[:2] + "/" + filename[2:];
 }
 
 sha2string(sha: array of byte): string
 {
 	ret : string = "";
-	for(i := 0; i < SHALEN; i++)
-	{
+	for(i := 0; i < SHALEN; i++){
 		i1 : int = int sha[i] & 16rf;
 		i2 : int = (int sha[i] & 16rf0) >> 4;
 		ret += hex[i2] + hex[i1];
@@ -185,16 +185,14 @@ exists(shaname: string): int
 filesha1(filename: string): array of byte
 {
 	fd := sys->open(filename, Sys->OREAD);
-	if(fd == nil)
-	{
+	if(fd == nil){
 		return nil;
 	}
 
 	buf := array[Sys->ATOMICIO] of byte;
 	cnt : int;
 	state : ref Keyring->DigestState = nil;
-	while((cnt = sys->read(fd, buf, Sys->ATOMICIO)) > 0)
-	{
+	while((cnt = sys->read(fd, buf, Sys->ATOMICIO)) > 0){
 		state = keyring->sha1(buf,cnt, nil, state);		
 	}
 	sha := array[SHALEN] of byte;
@@ -216,8 +214,7 @@ int2string(num: int): string
 {
 	sys = load Sys Sys->PATH;
 	ret := "";
-	do
-	{
+	do{
 		ret = hex[num % 10] + ret;
 		num /= 10;
 	}while(num > 0);
@@ -302,7 +299,7 @@ extractfile(shafilename: string): string
 
 getuserinfo(): ref Strhash[ref Config]
 {
-	iobuf := bufio->open("config", Bufio->OREAD);
+	iobuf := bufio->open(REPOPATH + "config", Bufio->OREAD);
 	config := Strhash[ref Config].new(10, nil);
 	while((s := iobuf.gets('\n')) != "")		
 	{
@@ -342,8 +339,7 @@ readline(ibuf: ref Iobuf): string
 
 equalshas(sha1, sha2: array of byte): int
 {
-	for(i := 0; i < SHALEN; i++)
-	{
+	for(i := 0; i < SHALEN; i++){
 		if(sha1[i] != sha2[i])
 			return 0;
 	}

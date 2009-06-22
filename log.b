@@ -1,5 +1,6 @@
 implement Log;
 
+
 include "sys.m";
 	sys: Sys;
 
@@ -20,55 +21,46 @@ include "string.m";
 	stringmodule: String;
 splitr: import stringmodule;	
 
-stderr: ref Sys->FD;	
-	
-Log: module
-{
-	init: fn(nil: ref Draw->Context, args: list of string);
-};
+include "log.m";
 
-init(nil: ref Draw->Context, args: list of string)
+stderr: ref Sys->FD;	
+msgchan: chan of array of byte;	
+REPOPATH: string;
+	
+init(ch: chan of array of byte, args: list of string)
 {
 	sys = load Sys Sys->PATH;
-	utils = load Utils Utils->PATH;
 	stringmodule = load String String->PATH;
+	utils = load Utils Utils->PATH;
+
+	REPOPATH = hd args; 
+	utils->init(REPOPATH);
 	bufio = load Bufio Bufio->PATH;
-	utils->init();
 
-	stderr = sys->fildes(2);
-
-	if(len args != 2 || !exists(hd (tl args)))
-	{
-		usage();
-		return;
-	}
-	
+	msgchan = ch;
 	showlog(tl args);
-	
 }
 
 showlog(commits: list of string)
 {
-	if(commits == nil)
+	if(commits == nil){
+		msgchan <-= nil;
 		return;
+	}
 	sha1 := hd commits;
 	commits = tl commits;
 
 	(filetype, filesize, buf) := readsha1file(sha1);
-	sys->print("filetype %s; filesize: %d\n",filetype, filesize);
 	if(filetype != "commit")
-	{
-		sys->print("%s is not commit\n", sha1);
 		return showlog(commits);
-	}
-	sys->print("Commit: %s\n", sha1);
+
+	msgchan <-= sys->aprint("Commit: %s\n", sha1);
 	ibuf := bufio->aopen(buf);
 
 	#reading tree and throwing it away(maybe it can be used in the future).
 	ibuf.gets('\n');
 
-	while((s := ibuf.gets('\n')) != nil)
-	{
+	while((s := ibuf.gets('\n')) != nil){
 		(t, parentsha1) := splitr(s, " ");
 		if(t != "parent ")
 			break;
@@ -79,8 +71,9 @@ showlog(commits: list of string)
 	committer := ibuf.gets('\n');
 	ibuf.gets('\n');
 	comments := ibuf.gets('\0');
-	sys->print("%s\n", author);
-	sys->print("%s\n", comments);
+	msgchan <-= sys->aprint("%s\n", author);
+	msgchan <-= sys->aprint("%s\n", committer);
+	msgchan <-= sys->aprint("%s\n", comments);
 
 	showlog(commits);
 }

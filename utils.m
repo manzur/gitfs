@@ -1,7 +1,7 @@
 
 Utils: module
 {
-	PATH: con "utils.dis";
+	PATH: con "/dis/git/utils.dis";
 	QIDSZ:    con 16;
 	BIGSZ:    con 8;
 	INTSZ:    con 4;
@@ -15,7 +15,7 @@ Utils: module
 		attr, val: string;
 	};
 
-	init:          fn();
+	init:          fn(repopath: string);
 	
 	writesha1file: fn(ch: chan of (int, array of byte));
 	readsha1file:  fn(path: string): (string, int, array of byte);
