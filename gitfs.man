@@ -1,0 +1,95 @@
+.TH GitFS 4 
+.SH Name
+gitfs \- file server for git scm
+.SH Synopsis
+mount {gitfs srcdir} 
+[
+.BI -m " mountpoint"
+] 
+[
+.BI -c " configfile"
+]
+[
+.BI -h " repository"
+]
+.SH Description
+.B gitfs
+is a file server that represents git repository. Git commands are executed by writing them into the 
+.I ctl
+file. Result of a command is stored in the 
+.I data 
+file. 
+.PP
+There's no "interactive" mode for 
+.I git-commit. 
+Commit message should be written to 
+.I ctl
+file, 
+or another file. 
+.PP
+.I git-add
+command doesn't have interactive mode yet. 
+.PP
+Objects located in objects can be read as ordinary files. Results are the same
+as 
+.I git-show
+command is executed.
+.SH Options 
+.TP
+.BI -m " mountpoint"
+Mountpoint is point where to mount file server. By default it mounts to /n/git.
+.TP
+.BI -c " configfile"
+Config file that can contain settings for repository.
+.TP
+.BI -h " repository"
+Path to repository. By default it searches for .git directory in the path 
+from current directory upto the /.
+.SH Hierarchy
+.TP
+.B /log
+File that contains log. If you want to use options for git-log
+you can write options to ctl file and get results from data file.
+This file contains unfiltered log of the repository, i.e. it's the same
+what git-log does by default.
+.TP
+.B /tags
+Directory, which contains tags. 
+.TP
+.B /config
+Repository specific configurations are stored in this file. 
+.TP
+.B /exclude
+File that contains patterns of file names to exclude from 
+.I git-add.
+.TP
+.B /objects/[0-9a-f][0-9a-f]
+This directory object store associated with the repository. Each subdirectory contains objects(blobs, tags, trees, commits) 
+of the repository.
+.TP
+.B /files/*
+This directory contains the files from the srcdir. 
+.TP
+.B /ctl
+File that's used for operating with git. Commands can be send are: commit, gc, add, branch, reset, status, checkout, merge, rm.
+.TP
+.B /data
+Results of executed commands in the 
+.I ctl
+file are stored here.	
+.SH Examples
+Mount git repository and read the unfiltered log file.
+.PP	
+mount {gitfs dir} mntpt
+cat mntpt/log
+unmount mntpt	
+.PP
+The same as above but with filtering and getting log for the last 2 weeks
+.PP
+echo 'log --since=2 weeks ago' > ctl
+cat git_repo/data
+.SH Source
+.SH See also
+.SH Bugs	
+
+
