@@ -192,10 +192,15 @@ mainloop:
 				else if(fid.path == big QRootLog){
 					logch := chan of array of byte;
 					fd := sys->open(REPOPATH + "head", Sys->OREAD);
+					if(fd == nil){
+						sys->print("head is not found\n");
+						srv.reply(ref Rmsg.Read(m.tag, nil));
+						continue mainloop;		
+					}
 					headbuf := array[40] of byte; 
 					sys->read(fd, headbuf, len headbuf);
 					head := string headbuf;
-					sys->print("head is %s\n", head);
+					sys->print("REPOPATH = %s; head is %s\n", REPOPATH, head);
 					spawn log->init(logch, REPOPATH :: head :: nil);
 
 					offset := m.offset;
@@ -278,6 +283,10 @@ ctl(m: ref Tmsg.Write)
 
 	case command{
 		"init" => sys->print("init\n");
+			initmod := load Initgit "/dis/git/init.dis";
+			 if(initmod == nil){
+				sys->print("initmod load failed: %r\n");
+			}
 			 spawn initmod->init(REPOPATH :: nil);
 
 		"add" => sys->print("add\n");		

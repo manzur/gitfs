@@ -113,6 +113,10 @@ init(nil : ref Draw->Context, args : list of string)
 	sys->print("from makefileisaidisaid\n");
 	table := Table[ref DD].new(13, nil);
 	sys->print("%bd;%bd", big string big 15, big 15);
+	mm: Mymodule = load Mymodule "test1.dis";
+	if(mm == nil){
+		sys->print("mm load error: %r\n");
+	}
 }
 
 testlist(l: list of ref Someadt)
