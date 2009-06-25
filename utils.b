@@ -361,3 +361,12 @@ isdir(mode: int): int
 {
 	return mode & 16384;
 }
+
+bytepos(a: array of byte, offset: int, delim: byte): int
+{
+	for(i := offset; i < len a; i++){
+		if(a[i] == delim)
+			return i;
+	}
+	return -1;
+}

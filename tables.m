@@ -1,5 +1,5 @@
 Tables: module {
-	PATH: con "tables.dis";
+	PATH: con "/dis/git/tables.dis";
 	Table: adt[T] {
 		items:	array of list of (int, T);
 		nilval:	T;

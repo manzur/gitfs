@@ -54,11 +54,14 @@ showlog(commits: list of string)
 	if(filetype != "commit")
 		return showlog(commits);
 
+
 	msgchan <-= sys->aprint("Commit: %s\n", sha1);
+
 	ibuf := bufio->aopen(buf);
 
 	#reading tree and throwing it away(maybe it can be used in the future).
 	ibuf.gets('\n');
+
 
 	while((s := ibuf.gets('\n')) != nil){
 		(t, parentsha1) := splitr(s, " ");

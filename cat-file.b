@@ -13,6 +13,7 @@ Iobuf: import bufio;
 	
 include "utils.m";
 	utils: Utils;
+bytepos, sha2string, SHALEN: import utils;	
 	
 include "cat-file.m";
 
@@ -36,14 +37,25 @@ init(repopath: string, typeonly: int, path: string, ch: chan of array of byte)
 catfile(path: string)
 {
 	(filetype, filesize, buf) := utils->readsha1file(path);	
-	offset := 0;
 
 	msgchan <-= sys->aprint("filetype: %s\n", filetype);
 	if(printtypeonly){
 		msgchan <-= nil;
 		return;
 	}
-	msgchan <-= buf[offset:];
+	str := "";
+	offset := 0;
+	while(filetype == "tree" && (pos := bytepos(buf, offset, byte 0)) != -1){
+		pos++;
+		sha1 := buf[pos: pos + SHALEN];
+		str += string buf[offset: pos - 1];
+		str += " " + sha2string(sha1);
+		offset = pos + SHALEN;
+	}
+	if(filetype == "tree")
+		msgchan <-= sys->aprint("%s", str);
+	else
+		msgchan <-= buf[:];
 }
 
 usage()

@@ -42,7 +42,7 @@ init(args: list of string)
 	REPOPATH = hd args;
 	utils->init(REPOPATH);
 	index = Index.new(REPOPATH);
-	index.readindex(REPOPATH + utils->INDEXPATH);
+	index.readindex(utils->INDEXPATH);
 	stderr = sys->fildes(2);
 	showdiffs();
 }
@@ -60,7 +60,7 @@ showdiffs()
 filechanged(entry: ref Entry): int
 {
 	sys->print("name is: %s\n", entry.name);
-	(ret, dirstat) := sys->stat(entry.name);
+	(ret, dirstat) := sys->stat(REPOPATH + entry.name);
 	if(ret == -1){
 		sys->fprint(stderr, "File stat failed: %r\n");
 		return 0;
@@ -75,5 +75,5 @@ showdiff(entry: ref Entry)
 {
 	#loads acme-sac diff
 	diff = load Command "/dis/git/acdiff.dis";
-	diff->init(nil, list of {"diff", "-u",utils->extractfile(utils->sha2string(entry.sha1)), entry.name});
+	diff->init(nil, list of {"diff", "-u",utils->extractfile(utils->sha2string(entry.sha1)), REPOPATH + entry.name});
 }

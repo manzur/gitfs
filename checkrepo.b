@@ -56,7 +56,7 @@ init(args: list of string)
 
 check()
 {
-	readrepo(OBJECTSTOREPATH);
+	readrepo(REPOPATH + OBJECTSTOREPATH);
 
 	cnt := 0;
 	for(i := 0; i < HASHSZ; i++){

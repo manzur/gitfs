@@ -34,8 +34,12 @@ REPOPATH: string;
 
 Index.new(repopath: string): ref Index
 {
-	tables = load Tables Tables->PATH;
 	sys = load Sys Sys->PATH;
+	tables = load Tables Tables->PATH;
+	if(tables == nil){
+		sys->print("tables is nil: %r\n");
+	
+	}
 	utils = load Utils Utils->PATH;
 	keyring = load Keyring Keyring->PATH;
 	exclude = load Exclude Exclude->PATH;
@@ -155,7 +159,7 @@ Header.new(): ref Header
 #return: number of elements read from index file
 Index.readindex(index: self ref Index, path : string) : int
 {
-	indexfd := sys->open(path, Sys->OREAD);
+	indexfd := sys->open(REPOPATH + path, Sys->OREAD);
 
 	if(indexfd == nil){
 		sys->fprint(stderr,"file access error: %r\n");
@@ -222,7 +226,7 @@ Index.readindex(index: self ref Index, path : string) : int
 #return: number of elements written to the index file
 Index.writeindex(index: self ref Index, path : string) : int
 {
-	fd := sys->create(path, Sys->OWRITE, 8r644);
+	fd := sys->create(REPOPATH + path, Sys->OWRITE, 8r644);
 	if(fd == nil){
 		sys->fprint(stderr, "write index error: %r\n");
 		return 0;
@@ -254,8 +258,7 @@ Index.writeindex(index: self ref Index, path : string) : int
 		entrybuf = (hd l).unpack();
 
 		cnt := sys->write(fd, entrybuf, len entrybuf);
-		if(cnt != len entrybuf)
-		{
+		if(cnt != len entrybuf){
 			sys->print("couldn't write entry to the file: %r\n");
 			return cnt;
 		}
@@ -407,7 +410,7 @@ initentry(filename: string): ref Entry
 {
 	entry: Entry;
 
-	(retval, dirstat) := sys->stat(filename);
+	(retval, dirstat) := sys->stat(REPOPATH + filename);
 	if(retval != 0)
 	{
 		sys->fprint(stderr,"stat error: %r\n");

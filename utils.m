@@ -51,6 +51,7 @@ Utils: module
 	warn: 	       fn(s: string);
 
 	isdir:         fn(mode: int): int;
+	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 
 
 };
 

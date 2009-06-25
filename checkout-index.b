@@ -39,19 +39,18 @@ init(args: list of string)
 	utils = load Utils Utils->PATH;
 
 	REPOPATH = hd args;
-	args = tl args;
+
 	utils->init(REPOPATH);
 	index = Index.new(REPOPATH);
 	stderr = sys->fildes(2);
-	if(!index.readindex(REPOPATH + INDEXPATH))
+	if(!index.readindex(INDEXPATH))
 	{
 		sys->fprint(stderr, "index read error\n");
 		exit;
 	}
 	
 	arg->init(args);
-	while((c := arg->opt()) != 0)
-	{
+	while((c := arg->opt()) != 0){
 		case c
 		{
 			'a' => all = 1;
@@ -118,7 +117,10 @@ checkoutentry(fd: ref Sys->FD, entry: ref Entry)
 checkoutall()
 {
 	for(l := index.entries.all(); l != nil; l = tl l)
+	{
+		sys->print("checking out: %s\n", (hd l).name);
 		checkoutfile((hd l).name);
+	}
 }
 
 dirname(path: string): string
@@ -135,6 +137,7 @@ makedirs(path: string)
 	if(!exists(path))
 		makedirs(dirname(path));
 	sys->create(path, Sys->OREAD,  Sys->DMDIR|8r755);
+
 }
 
 exists(path: string): int

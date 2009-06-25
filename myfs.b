@@ -28,6 +28,9 @@ include "cat-file.m";
 include "readdir.m";
 	readdir: Readdir;
 
+include "lists.m";
+	lists: Lists;
+
 include "tables.m";
 	tables: Tables;
 Strhash: import tables;	
@@ -36,6 +39,23 @@ include "init.m";
 	initmod: Initgit;
 
 include "update-index.m";
+	indexmod: Updateindex;
+
+include "write-tree.m";
+
+include "read-tree.m";
+
+include "show-diff.m";
+
+include "diff-tree.m";
+
+include "commit-tree.m";
+
+include "checkrepo.m";
+
+include "checkout-index.m";
+
+include "workdir.m";
 
 repopath: string;
  
@@ -67,18 +87,20 @@ init(nil: ref Draw->Context, args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	daytime = load Daytime Daytime->PATH;
+	lists = load Lists Lists->PATH;
 	tables = load Tables Tables->PATH;
 	stringmod = load String String->PATH;
 	log = load Log Log->PATH;
 	catfile = load Catfile Catfile->PATH;
 	readdir = load Readdir Readdir->PATH;
 	initmod = load Initgit Initgit->PATH;
+	indexmod = load Updateindex Updateindex->PATH;
 	
 	if(len args != 2)
 		usage();
 	
 
-	REPOPATH = hd (tl args);
+	REPOPATH = makeabsolute(hd (tl args));
 	repopath = REPOPATH;
 	if(REPOPATH[len REPOPATH - 1] != '/'){
 		REPOPATH += "/";
@@ -235,6 +257,7 @@ mainloop:
 					item1 := table.find(string fid.path);
 					item2 := table.find(string item1.parentqid);
 
+					sys->print("myfs: reading file under objects\n");
 					#if objects is git object;FIXME: should be added code for checking zlib header
 					if(item2 != nil && item2.parentqid == big QRootObjects){
 						path := item2.dirstat.name + item1.dirstat.name;
@@ -281,27 +304,56 @@ ctl(m: ref Tmsg.Write)
 	if(s != nil)
 		s = s[1:];
 
+	 args: list of string = nil;
+	 elem: string;
+	 while(s != ""){
+		 (elem, s) = stringmod->splitl(s, " ");
+		 sys->print("==>%s\n", elem);
+		 args = elem :: args;
+		 if(s != nil)
+			 s = s[1:];
+	 }
+	args = lists->reverse(args);
 	case command{
 		"init" => sys->print("init\n");
-			initmod := load Initgit "/dis/git/init.dis";
-			 if(initmod == nil){
-				sys->print("initmod load failed: %r\n");
-			}
 			 spawn initmod->init(REPOPATH :: nil);
 
 		"add" => sys->print("add\n");		
-			 indexmod := load Updateindex Updateindex->PATH;
-			 l: list of string = nil;
-			 elem: string;
-			 while(s != ""){
-				 (elem, s) = stringmod->splitl(s, " ");
-				 l = elem :: l;
-				 if(s != nil)
-					 s = s[1:];
-			 }
-			 spawn indexmod->init(REPOPATH :: "-a" ::l);
+			 spawn indexmod->init(REPOPATH :: "-a" ::args);
+
+		"print" => sys->print("print\n");
+			spawn indexmod->init(REPOPATH :: nil);
 
 		"remove" => sys->print("remove\n");
+			spawn indexmod->init(REPOPATH :: "-r" :: args);
+		
+		"show-diff" => sys->print("show-diff\n");
+			showdiff := load Showdiff Showdiff->PATH;
+			spawn showdiff->init(REPOPATH :: nil);
+		
+		"write-tree" => sys->print("write-tree\n");
+			writetree := load Writetree Writetree->PATH;
+			spawn writetree->init(REPOPATH :: nil); 
+
+		"read-tree" => sys->print("read-tree\n");
+			readtree := load Readtree Readtree->PATH;
+			readtree->init(REPOPATH :: args);
+
+		"checkrepo" => sys->print("checkrepo\n");
+			checkrepo := load Checkrepo Checkrepo->PATH;
+			checkrepo->init(REPOPATH :: args);
+
+		"checkoutindex" => sys->print("checkoutindex\n");
+			checkoutindex := load Checkoutindex Checkoutindex->PATH;
+			checkoutindex->init(REPOPATH :: args);
+
+		"diff-tree" => sys->print("diff-tree\n");
+			difftree := load Difftree Difftree->PATH;
+			difftree->init(REPOPATH :: args);
+
+		"commit" => sys->print("commit\n");
+			committree := load Committree Committree->PATH;
+			committree->init(REPOPATH :: args);
 		* => sys->print("default\n");
 	}
 }
@@ -402,4 +454,20 @@ usage()
 {
 	sys->fprint(sys->fildes(2), "mount {myfs dir} mntpt");
 	exit;
+}
+
+makeabsolute(path: string): string
+{
+	if(path == "" || path[0] == '/') return path;
+	
+	gwd := load Workdir Workdir->PATH;
+	pwd := gwd->init();
+
+	if(path[0] == '.'){
+		if(len path <= 2)
+			return pwd;
+		return pwd + path[2:];
+	}
+
+	return pwd + "/" + path;
 }

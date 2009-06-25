@@ -58,33 +58,31 @@ init(args: list of string)
 	REPOPATH = hd args;
 	args = tl args;
 	
-	arg->init(args);
 	utils->init(REPOPATH);
 	deflate->init();
 
 	parents: list of string = nil;
-	sha := arg->arg();
 
-	while((c := arg->opt()) != 0)
-	{
-		case c
-		{
+	sha := hd args;
+		arg->init(args);
+
+	while((c := arg->opt()) != 0){
+		case c{
 
 			'p' => parents = arg->arg() :: parents;
 			 *  => usage(); return; 
 		}
 	}
 
-	commit(sha, parents);
+	commit(sha, parents, arg->argv());
 }
 
-commit(treesha: string, parents: list of string): string
+commit(treesha: string, parents: list of string, args: list of string): string
 {
 	if(!utils->exists(treesha)){
 		sys->fprint(stderr, "no such tree file\n");
 		return "";
 	}
-
 	for(l := parents; l != nil; l = tl l){
 		if(!utils->exists(hd l)){
 			sys->fprint(stderr, "no such sha file: %s\n", hd l);
@@ -100,15 +98,34 @@ commit(treesha: string, parents: list of string): string
 	}
 	config: ref Strhash[ref Config];
 	config = utils->getuserinfo();
-	authorname := env->getenv("AUTHOR_NAME");
-	authoremail := env->getenv("AUTHOR_EMAIL");
-	authordate := env->getenv("AUTHOR_DATE");
-	
-	if(authorname == "" || authoremail == ""){
-		(authorname, authoremail) = getpersoninfo("author");	
-	}
 
-	(comname, comemail) := getpersoninfo("committer");
+	authorname := hd args;
+	args = tl args;
+
+	authoremail := hd args;
+	args = tl args;
+	
+	authordate := hd args;
+	args = tl args;
+
+	comname := hd args;
+	args = tl args;
+	
+	comemail := hd args;
+	args = tl args;
+
+#	authorname := env->getenv("AUTHOR_NAME");
+#	authoremail := env->getenv("AUTHOR_EMAIL");
+#	authordate := env->getenv("AUTHOR_DATE");
+#	
+#	if(authorname == "" || authoremail == ""){
+#		(authorname, authoremail) = getpersoninfo("author");	
+#	}
+#
+#	(comname, comemail) := (config.find("user"), config.find("email")););
+#	if(comname == "" || comemail == ""){
+#		(comname, comemail) = getpersoninfo("committer");
+#	}
 	date := daytime->time();
 
 	if(authordate == "")
@@ -117,7 +134,12 @@ commit(treesha: string, parents: list of string): string
 	commitmsg += "author " + authorname + " <" + authoremail + "> " + authordate + "\n";
 	commitmsg += "committer " + comname + " <" + comemail + "> " + date + "\n\n";
 
-	commitmsg += getcomment();
+	while(args != nil){
+		commitmsg += hd args;
+		args = tl args;
+	}
+#	commitmsg += getcomment();
+
 
 	commitlen := int2string(len commitmsg);
 	#6 - "commit", 1 - " ", 1 - '\0'
@@ -137,9 +159,13 @@ commit(treesha: string, parents: list of string): string
 	ch <-= (0, buf);
 	(sz, sha) = <-ch;
 
-	fd := sys->open(REPOPATH + "head", Sys->OWRITE);
-	sys->fprint(fd, "%s", treesha);
-	return sha2string(sha);
+	fd := sys->create(REPOPATH + "head", Sys->OWRITE, 8r644);
+	
+	ret := sha2string(sha);
+
+	sys->fprint(fd, "%s", ret);
+
+	return ret;
 }
 
 
@@ -149,6 +175,7 @@ getpersoninfo(pos: string): (string, string)
 	ibuf := bufio->fopen(sys->fildes(0), bufio->OREAD);
 	
 	sys->print("Enter %s's name: ", pos);
+	buf := array[128] of byte;
 	name := readline(ibuf);	
 
 	sys->print("Enter %s's email: ", pos);

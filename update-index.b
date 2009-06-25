@@ -38,6 +38,9 @@ init(args: list of string)
 {
 	sys = load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
+	if(gitindex == nil){
+		sys->print("gitindex is nil %r\n");
+	}
 	tables = load Tables Tables->PATH;
 	readdir = load Readdir Readdir->PATH;
 	
@@ -45,7 +48,7 @@ init(args: list of string)
 	stderr = sys->fildes(2);
 	sys->create(REPOPATH + "index.lock", Sys->OWRITE | Sys->OEXCL, Sys->DMEXCL | 8r644);
 	index = Index.new(REPOPATH);
-	cnt := index.readindex(REPOPATH + INDEXPATH);
+	cnt := index.readindex(INDEXPATH);
 	if(cnt < 0)
 		return;
 
@@ -57,7 +60,6 @@ init(args: list of string)
 			addfile(hd args);
 			args = tl args;
 		}
-
 	}
 	else if(args != nil && hd args == "-r"){
 		args = tl args;
@@ -70,7 +72,7 @@ init(args: list of string)
 
 	printindex(index);
 	sys->print("Writing to index\n");
-	index.writeindex(REPOPATH + "index.lock");
+	index.writeindex("index.lock");
 
 	#renaming index.lock to index
 	dirstat := sys->nulldir;
@@ -86,21 +88,20 @@ printindex(index: ref Index)
 {
 	table := index.entries;
 	if(table == nil) sys->print("its nill\n");
-	for( l := table.all(); l != nil; l = tl l)
-	{
-		sys->print("Name: %s\n", (hd l).name);
-		sys->print("Length: %bd\n", (hd l).length);
+	for(l := table.all(); l != nil; l = tl l){
+		sys->print("Name:%s\n", (hd l).name);
+		sys->print("Length:%bd\n", (hd l).length);
 	}
 }
 
 addfile(path: string)
 {
-	(ret, dirstat) := sys->stat(path);
+	(ret, dirstat) := sys->stat(REPOPATH + path);
 	if(ret == -1)
 		sys->fprint(stderr, "%s does not exist\n", path);
 	if(dirstat.mode & Sys->DMDIR)
 	{
-		(dirs,cnt)  := readdir->init(path,Readdir->NAME);
+		(dirs,cnt)  := readdir->init(REPOPATH + path,Readdir->NAME);
 		if(path[len path - 1] != '/')
 			path += "/";
 
