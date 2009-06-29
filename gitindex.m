@@ -53,7 +53,7 @@ Gitindex : module
 		rmfile:     fn(index: self ref Index, path: string);
 		readindex:  fn(index: self ref Index, path: string): int;
 		writeindex: fn(index: self ref Index, path: string): int;
-		new:        fn(repopath: string): ref Index;
+		new:        fn(repopath: string, debug: int): ref Index;
 	};
 	
 		

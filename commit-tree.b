@@ -4,6 +4,7 @@ include "commit-tree.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
 
 include "arg.m";
 	arg: Arg;
@@ -23,7 +24,7 @@ Strhash: import tables;
 include "utils.m";
 	utils: Utils;
 Config: import utils;
-chomp, readline, int2string, sha2string: import utils;
+error, debugmsg, chomp, readline, int2string, sha2string: import utils;
 
 
 include "daytime.m";
@@ -36,7 +37,7 @@ stderr: ref Sys->FD;
 REPOPATH: string;
 
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	arg = load Arg Arg->PATH;
@@ -50,15 +51,12 @@ init(args: list of string)
 	stderr = sys->fildes(2);
 
 	if(len args < 2)
-	{
 		usage();
-		exit;
-	}
 
 	REPOPATH = hd args;
 	args = tl args;
 	
-	utils->init(REPOPATH);
+	utils->init(REPOPATH, debug);
 	deflate->init();
 
 	parents: list of string = nil;
@@ -80,12 +78,12 @@ init(args: list of string)
 commit(treesha: string, parents: list of string, args: list of string): string
 {
 	if(!utils->exists(treesha)){
-		sys->fprint(stderr, "no such tree file\n");
+		error(sprint("no such tree(%s) file: %r\n", treesha));
 		return "";
 	}
 	for(l := parents; l != nil; l = tl l){
 		if(!utils->exists(hd l)){
-			sys->fprint(stderr, "no such sha file: %s\n", hd l);
+			error(sprint("no such sha file: %s\n", hd l));
 			return "";
 		}
 	}
@@ -149,7 +147,7 @@ commit(treesha: string, parents: list of string, args: list of string): string
 	buf[7 + len commitlen] = byte 0;
 	buf[7 + len commitlen + 1:] = array of byte commitmsg;
 
-	sys->print("Commitmsg: %s", commitmsg);
+	debugmsg(sprint("Commitmsg: %s", commitmsg));
 
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
@@ -195,6 +193,6 @@ getcomment(): string
 
 usage()
 {
-	sys->fprint(sys->fildes(1), "commit-tree sha1 [-p sha1]");
-	return;
+	error("commit-tree sha1 [-p sha1]");
+	exit;
 }

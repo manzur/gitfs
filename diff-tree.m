@@ -2,5 +2,5 @@
 Difftree: module
 {
 	PATH: con "/dis/git/diff-tree.dis";
-	init: fn(args: list of string);
+	init: fn(args: list of string, debug: int);
 };

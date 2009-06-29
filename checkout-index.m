@@ -2,7 +2,7 @@
 Checkoutindex: module
 {
 	PATH: con "/dis/git/checkout-index.dis";
-	init: fn(args: list of string);
+	init: fn(args: list of string, debug: int);
 };
 
 

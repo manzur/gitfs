@@ -21,9 +21,6 @@ include "string.m";
 include "utils.m";
 	utils: Utils;
 
-include "lists.m";
-	lists: Lists;
-
 include "readdir.m";
 	readdir: Readdir;
 	
@@ -33,6 +30,11 @@ include "filepat.m";
 include "exclude.m";
 	exclude: Exclude;
 
+include "workdir.m";
+	gwd: Workdir;
+
+include "lists.m";
+	lists: Lists;
 
 print : import sys;
 
@@ -88,6 +90,9 @@ strchr(s: string, ch: int): int
 include "test1.m";
 	test1: Test1;
 
+include "test2.m";
+	test2: Test2;
+
 include "arg.m";
 	arg: Arg;
 
@@ -110,13 +115,10 @@ init(nil : ref Draw->Context, args : list of string)
 	filepat := load Filepat Filepat->PATH;
 	exclude  = load Exclude Exclude->PATH;
 
-	sys->print("from makefileisaidisaid\n");
-	table := Table[ref DD].new(13, nil);
-	sys->print("%bd;%bd", big string big 15, big 15);
-	mm: Mymodule = load Mymodule "test1.dis";
-	if(mm == nil){
-		sys->print("mm load error: %r\n");
-	}
+	test1 := load Test1 Test1->PATH;
+	test2 := load Test2 Test2->PATH;
+	test2->init(nil, nil);
+	sys->print("flag from test is %d\n", test1->flag);
 }
 
 testlist(l: list of ref Someadt)

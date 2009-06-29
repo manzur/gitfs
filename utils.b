@@ -4,6 +4,8 @@ include "utils.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
+
 
 include "draw.m";
 
@@ -34,7 +36,7 @@ hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
 
 stderr: ref Sys->FD;
 
-init(repopath: string)
+init(repopath: string, deb: int)
 {
 	sys = load Sys Sys->PATH;
 	keyring = load Keyring Keyring->PATH;
@@ -47,6 +49,7 @@ init(repopath: string)
 	deflate->init();
 	stderr = sys->fildes(2);
 	REPOPATH = repopath;
+	debug = deb;
 }
 
 writesha1file(ch: chan of (int, array of byte))
@@ -63,7 +66,7 @@ mainloop:
 		pick rq := <-rqchan
 		{
 			Finished => if(len rq.buf > 0) 
-					sys->print("Data remained\n");
+					debugmsg("Data remained\n");
 				    break mainloop;
 
 			Result => 
@@ -78,26 +81,26 @@ mainloop:
 				rq.buf[:] = buf[:];
 				rq.reply <-= sz;
 			Error =>
-				sys->print("error ocurred: %s\n", rq.e);
+				error(sprint("error ocurred: %s\n", rq.e));
 				return;
 		}
 	}
 		
 	sha := bufsha1(old);		    
 	save2file(string2path(sha2string(sha)), old);
-	sys->print("file was written to: %s\n", sha2string(sha));
+	debugmsg(sprint("file was written to: %s\n", sha2string(sha)));
 	ch <-= (SHALEN, sha);	
 }
 
 readsha1file(shafilename: string): (string, int, array of byte)
 {
-	sys->print("in readshafile\n");
+	debugmsg("in readshafile\n");
 	fd := sys->open(string2path(shafilename), Sys->OREAD);
 	if(fd == nil){
-		sys->print("file not found\n");
+		error(sprint("file(%s) not found\n", string2path(shafilename)));
 		return ("", 0, nil);
 	}
-	sys->print("after if\n");
+	debugmsg("after if\n");
 	rqchan := inflate->start("z");
 	old := array[0] of byte;
 
@@ -106,7 +109,7 @@ mainloop:
 		pick rq := <-rqchan
 		{
 			Finished => if(len rq.buf > 0) 
-					sys->print("Data remained\n");
+					debugmsg("Data remained\n");
 				    break mainloop;
 
 			Result => 
@@ -123,7 +126,7 @@ mainloop:
 				rq.reply <-= cnt;
 
 			Error =>
-				sys->print("error ocurred: %s\n", rq.e);
+				error(sprint("error ocurred: %s\n", rq.e));
 				return ("", 0, nil);
 		}
 	}
@@ -134,13 +137,13 @@ mainloop:
 	}
 
 	if(i < 0 || i >= len old){
-		sys->print("wrong file format\n");
+		error("wrong file format\n");
 		return ("",0,nil);
 	}
 
 	pos := strchr(string old[:i], ' ');
 
-	sys->print("finishing readhs1\n");
+	debugmsg("finishing readhs1\n");
 	return (string old[:pos], bytes2int(old, pos + 1), old[i+1:]);
 }
 
@@ -155,7 +158,7 @@ strchr(s: string, ch: int): int
 
 string2path(filename: string): string
 {
-	return REPOPATH + "objects/" + filename[:2] + "/" + filename[2:];
+	return REPOPATH + OBJECTSTOREPATH + "/" + filename[:2] + "/" + filename[2:];
 }
 
 sha2string(sha: array of byte): string
@@ -346,17 +349,6 @@ equalshas(sha1, sha2: array of byte): int
 	return 1;
 }
 
-fail(s: string)
-{
-	warn(s);
-	exit;
-}
-
-warn(s: string)
-{
-	sys->fprint(sys->fildes(2), "%s\n", s);
-}
-
 isdir(mode: int): int
 {
 	return mode & 16384;
@@ -370,3 +362,15 @@ bytepos(a: array of byte, offset: int, delim: byte): int
 	}
 	return -1;
 }
+
+debugmsg(msg: string)
+{
+	if(debug == 1)
+		sys->fprint(stderr, "%s", msg);
+}
+
+error(msg: string)
+{
+	sys->fprint(stderr, "%s", msg);
+}
+

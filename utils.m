@@ -6,16 +6,19 @@ Utils: module
 	BIGSZ:    con 8;
 	INTSZ:    con 4;
 	SHALEN:   con 20;
-	INDEXPATH: con "index";
-	OBJECTSTOREPATH: con "objects";
+	INDEXPATH: con ".git/index";
+	HEADSPATH: con ".git/refs/heads";
+	OBJECTSTOREPATH: con ".git/objects";
 	CONFIGFILEPATH: con "config";
+
+	debug: int;
 
 	Config: adt
 	{
 		attr, val: string;
 	};
 
-	init:          fn(repopath: string);
+	init:          fn(repopath: string, debug: int);
 	
 	writesha1file: fn(ch: chan of (int, array of byte));
 	readsha1file:  fn(path: string): (string, int, array of byte);
@@ -47,12 +50,11 @@ Utils: module
 
 	readline:      fn(ibuf: ref Iobuf): string;
 
-	fail:	       fn(s: string);
-	warn: 	       fn(s: string);
-
 	isdir:         fn(mode: int): int;
 	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 
 
+	error:	       fn(msg: string);
+	debugmsg:      fn(msg: string);
 };
 
 

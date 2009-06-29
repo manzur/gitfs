@@ -2,6 +2,7 @@ implement Gitindex;
 
 include "sys.m";
 	sys : Sys;
+sprint: import sys;
 
 include "tables.m";
 	tables: Tables;
@@ -18,7 +19,7 @@ include "gitindex.m";
 include "utils.m";
 	utils: Utils;
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray, equalshas: import utils;
+debugmsg, error, bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray, equalshas: import utils;
 
 include "exclude.m";
 	exclude: Exclude;
@@ -27,27 +28,21 @@ include "exclude.m";
 include "keyring.m";
 	keyring: Keyring;
 
-stderr : ref Sys->FD;
 filebuf: array of byte;
 
 REPOPATH: string;
 
-Index.new(repopath: string): ref Index
+Index.new(repopath: string, debug: int): ref Index
 {
 	sys = load Sys Sys->PATH;
 	tables = load Tables Tables->PATH;
-	if(tables == nil){
-		sys->print("tables is nil: %r\n");
-	
-	}
 	utils = load Utils Utils->PATH;
 	keyring = load Keyring Keyring->PATH;
 	exclude = load Exclude Exclude->PATH;
 
 	REPOPATH = repopath;
-	utils->init(REPOPATH);
+	utils->init(REPOPATH, debug);
 	exclude->init(REPOPATH :: nil);
-	stderr = sys->fildes(2);
 
 	index: Index;
 	index.header = Header.new();
@@ -61,7 +56,7 @@ Index.new(repopath: string): ref Index
 Index.addfile(index: self ref Index, path : string) : int
 {
 	if(!verifypath(REPOPATH + path)){
-		sys->fprint(stderr, "wrong path: %r\n");
+		error(sprint("wrong path: %r\n"));
 		return -1;
 	}
 	if(exclude->excluded(path)) return -1;
@@ -89,7 +84,7 @@ Index.addfile(index: self ref Index, path : string) : int
 	else
 		index.entries.add(entry.name, entry);
 
-	sys->print("File added: %s\n", sha2string(entry.sha1));
+	debugmsg(sprint("File added: %s\n", sha2string(entry.sha1)));
 
 	return 0;
 }
@@ -139,7 +134,7 @@ writeblobfile(path: string): array of byte
 Index.rmfile(index: self ref Index, path : string) 
 {
 	if(index.entries.find(path) == nil){
-		sys->fprint(stderr, "there's no such file(%s) in the index\n", path);
+		error(sprint("there's no such file(%s) in the index\n", path));
 		return;
 	}
 	index.header.entriescnt--;
@@ -162,14 +157,14 @@ Index.readindex(index: self ref Index, path : string) : int
 	indexfd := sys->open(REPOPATH + path, Sys->OREAD);
 
 	if(indexfd == nil){
-		sys->fprint(stderr,"file access error: %r\n");
+		error(sprint("file access error: %r\n"));
 		return -1;
 	}
 
 	header := array[HEADERSZ] of byte;
 
 	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ){
-		sys->fprint(stderr, "Index format error: %r\n");
+		error(sprint("Index format error: %r\n"));
 		return -1;
 	}
 
@@ -194,7 +189,7 @@ Index.readindex(index: self ref Index, path : string) : int
 
 		ret := sys->read(indexfd, entrybuf, ENTRYSZ);
 		if(ret != ENTRYSZ){
-			sys->fprint(stderr,"index file error: %r\n");
+			error(sprint("index file error: %r\n"));
 			return 0;
 		}
 
@@ -217,7 +212,7 @@ Index.readindex(index: self ref Index, path : string) : int
 	sha1 := array[SHALEN] of byte;
 	keyring->sha1(temp, 0, sha1, state);
 	if(!verifyheader(index.header, sha1)){
-		sys->fprint(stderr, "header is not correct\n");
+		error("header is not correct\n");
 		return -1;
 	}
 	return index.header.entriescnt;
@@ -228,7 +223,7 @@ Index.writeindex(index: self ref Index, path : string) : int
 {
 	fd := sys->create(REPOPATH + path, Sys->OWRITE, 8r644);
 	if(fd == nil){
-		sys->fprint(stderr, "write index error: %r\n");
+		error(sprint("write index error: %r\n"));
 		return 0;
 	}
 
@@ -259,7 +254,7 @@ Index.writeindex(index: self ref Index, path : string) : int
 
 		cnt := sys->write(fd, entrybuf, len entrybuf);
 		if(cnt != len entrybuf){
-			sys->print("couldn't write entry to the file: %r\n");
+			error(sprint("couldn't write entry to the file: %r\n"));
 			return cnt;
 		}
 		#each entry is aligned by 8  
@@ -413,7 +408,7 @@ initentry(filename: string): ref Entry
 	(retval, dirstat) := sys->stat(REPOPATH + filename);
 	if(retval != 0)
 	{
-		sys->fprint(stderr,"stat error: %r\n");
+		error(sprint("stat error: %r\n"));
 		return nil;
 	}
 	

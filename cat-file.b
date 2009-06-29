@@ -21,13 +21,13 @@ msgchan: chan of array of byte;
 printtypeonly := 0;
 REPOPATH: string;
 
-init(repopath: string, typeonly: int, path: string, ch: chan of array of byte)
+init(repopath: string, typeonly: int, path: string, ch: chan of array of byte, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 
 	REPOPATH = repopath;
-	utils->init(repopath);
+	utils->init(repopath, debug);
        
 	printtypeonly = typeonly;
 	msgchan = ch;
@@ -36,7 +36,7 @@ init(repopath: string, typeonly: int, path: string, ch: chan of array of byte)
 
 catfile(path: string)
 {
-	(filetype, filesize, buf) := utils->readsha1file(path);	
+	(filetype, nil, buf) := utils->readsha1file(path);	
 
 	msgchan <-= sys->aprint("filetype: %s\n", filetype);
 	if(printtypeonly){

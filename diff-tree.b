@@ -4,6 +4,8 @@ include "diff-tree.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
+
 include "arg.m";
 	arg: Arg;
 
@@ -16,7 +18,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-SHALEN, equalshas, sha2string, exists,readsha1file, isdir: import utils;
+debugmsg, error, SHALEN, equalshas, sha2string, exists,readsha1file, isdir: import utils;
 
 include "string.m";
 	stringmodule: String;
@@ -27,10 +29,9 @@ Entry: import gitindex;
 
 recursive: int;
 
-stderr: ref Sys->FD;
 REPOPATH: string;
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
@@ -39,9 +40,7 @@ init(args: list of string)
 	stringmodule = load String String->PATH;
 
 	REPOPATH = hd args;
-	utils->init(REPOPATH);
-
-	stderr = sys->fildes(2);
+	utils->init(REPOPATH, debug);
 
 	if(len args < 3)
 		usage();
@@ -65,11 +64,11 @@ init(args: list of string)
 
 difftree(tree1, tree2: string, basename: string): int
 {
-	(filetype1, filesize1, buf1) := readsha1file(tree1);		
-	(filetype2, filesize2, buf2) := readsha1file(tree2);
+	(filetype1, nil, buf1) := readsha1file(tree1);		
+	(filetype2, nil, buf2) := readsha1file(tree2);
 
 	if(filetype1 != "tree" || filetype1 != filetype2){
-		sys->fprint(stderr,"files aren't tree\n");
+		error("files aren't tree\n");
 	}
 
 	
@@ -124,7 +123,6 @@ extractentry(buf: array of byte): ref Entry
 	name = name[1:len name -1];
 	entry.name = name;
 	entry.mode = stringmodule->toint(mode,8).t0;
-	sha1 := array[SHALEN] of byte;
 	ibuf.read(entry.sha1, SHALEN);
 
 	return entry;
@@ -136,7 +134,7 @@ showfile(prefix: string, treebuf: array of byte, basename: string)
 	if(recursive && isdir(entry.mode)){
 		(filetype, filesize, tree) := readsha1file(sha2string(entry.sha1));
 		if(filetype != "tree"){
-			sys->fprint(stderr, "corrupt tree sha %s\n", sha2string(entry.sha1));
+			error(sprint("corrupt tree sha %s\n", sha2string(entry.sha1)));
 			return;
 		}
 		showtree(prefix, tree, basename + entry.name + "/");
@@ -193,7 +191,7 @@ updatetree(tree: array of byte): array of byte
 
 usage()
 {
-	sys->fprint(stderr, "usage: diff-tree <tree-sha1> <tree-sha2>\n");
+	error("usage: diff-tree <tree-sha1> <tree-sha2>\n");
 	exit;
 }
 

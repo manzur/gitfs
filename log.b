@@ -27,14 +27,14 @@ stderr: ref Sys->FD;
 msgchan: chan of array of byte;	
 REPOPATH: string;
 	
-init(ch: chan of array of byte, args: list of string)
+init(ch: chan of array of byte, args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	stringmodule = load String String->PATH;
 	utils = load Utils Utils->PATH;
 
 	REPOPATH = hd args; 
-	utils->init(REPOPATH);
+	utils->init(REPOPATH, debug);
 	bufio = load Bufio Bufio->PATH;
 
 	msgchan = ch;

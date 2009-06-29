@@ -4,6 +4,7 @@ include "checkout-index.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
 
 include "tables.m";
 	tables: Tables;
@@ -19,18 +20,17 @@ Index, Entry: import gitindex;
 
 include "utils.m";
 	utils: Utils;
-INDEXPATH, sha2string,string2path, readsha1file: import utils;	
+debugmsg, error, INDEXPATH, sha2string,string2path, readsha1file: import utils;	
 
 include "arg.m";
 	arg: Arg;
 
 index: ref Index;
-stderr: ref Sys->FD;
 all: int = 0;
 force: int = 0;
 REPOPATH: string;
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	arg = load Arg Arg->PATH;
@@ -40,12 +40,11 @@ init(args: list of string)
 
 	REPOPATH = hd args;
 
-	utils->init(REPOPATH);
-	index = Index.new(REPOPATH);
-	stderr = sys->fildes(2);
+	utils->init(REPOPATH, debug);
+	index = Index.new(REPOPATH, debug);
 	if(!index.readindex(INDEXPATH))
 	{
-		sys->fprint(stderr, "index read error\n");
+		error("index read error\n");
 		exit;
 	}
 	
@@ -77,12 +76,12 @@ checkoutfile(path: string)
 	fullpath := REPOPATH + path;
 	entry := index.entries.find(path);
 	if(entry == nil){
-		sys->print("No such file: %s\n", path);
+		error(sprint("No such file: %s\n", path));
 		return;
 	}
 	#if file exists and force flag is off
 	if(!force && sys->open(fullpath, Sys->OREAD) != nil){
-		sys->fprint(stderr, "file(%s) exists\n", path);
+		error(sprint("file(%s) exists\n", path));
 		return;
 	}
 	fd := sys->create(fullpath, Sys->OWRITE, 8r644);
@@ -90,7 +89,7 @@ checkoutfile(path: string)
 		makedirs(dirname(fullpath));
 		fd = sys->create(fullpath, Sys->OWRITE, 8r644);
 		if(fd == nil){
-			sys->fprint(stderr, "file(%s) couldn't be created\n", path);
+			error(sprint("file(%s) couldn't be created\n", path));
 			return;
 		}
 	}
@@ -100,15 +99,15 @@ checkoutfile(path: string)
 checkoutentry(fd: ref Sys->FD, entry: ref Entry)
 {
 	(filetype, filesize, buf) := readsha1file(sha2string(entry.sha1));
-	sys->print("filetype: %s; filesize: %d\n", filetype, filesize);
+	debugmsg(sprint("filetype: %s; filesize: %d\n", filetype, filesize));
 	if(sys->write(fd, buf, len buf) != len buf){
-		sys->fprint(stderr, "error occured while writing to file: %r\n");
+		error(sprint("error occured while writing to file: %r\n"));
 		return;
 	}
 	dirstat := sys->nulldir;
 	dirstat.mode = entry.mode & 1023;
 	if(sys->fwstat(fd, dirstat)){
-		sys->fprint(stderr, "stat can't be changed: %r\n");
+		error(sprint("stat can't be changed: %r\n"));
 		return;
 	}
 }
@@ -118,7 +117,7 @@ checkoutall()
 {
 	for(l := index.entries.all(); l != nil; l = tl l)
 	{
-		sys->print("checking out: %s\n", (hd l).name);
+		debugmsg(sprint("checking out: %s\n", (hd l).name));
 		checkoutfile((hd l).name);
 	}
 }

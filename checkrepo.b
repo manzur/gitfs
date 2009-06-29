@@ -4,6 +4,7 @@ include "checkrepo.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
 
 include "tables.m";
 Strhash: import Tables;
@@ -14,7 +15,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-SHALEN, readsha1file, isdir, sha2string, OBJECTSTOREPATH: import utils;
+error, debugmsg, SHALEN, readsha1file, isdir, sha2string, OBJECTSTOREPATH: import utils;
 
 include "readdir.m";
 	readdir: Readdir;
@@ -40,7 +41,7 @@ checkvalidness: int;
 stderr: ref Sys->FD;
 REPOPATH: string;
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
@@ -49,8 +50,7 @@ init(args: list of string)
 	stringmodule = load String String->PATH;
 
 	REPOPATH = hd args;
-	utils->init(REPOPATH);
-	stderr = sys->fildes(2);
+	utils->init(REPOPATH, debug);
 	check();
 }
 
@@ -71,20 +71,20 @@ check()
 			}
 		}
 	}
-	sys->print("Object count is %d\n", cnt);
+	debugmsg(sprint("Object count is %d\n", cnt));
 }
 
 readrepo(path: string)
 {
-	(ret, dirstat) := sys->stat(path);
+	(ret, nil) := sys->stat(path);
 	#!isdir(mode)
 	if(ret == -1 )
 	{
-		sys->fprint(stderr, "Object store(%s) is not found\n", OBJECTSTOREPATH);
+		error(sprint("Object store(%s) is not found\n", OBJECTSTOREPATH));
 		exit;
 	}
 	for(i := 0; i < 256; i++){
-		subdir := sys->sprint("%s/%02x", path, i);
+		subdir := sprint("%s/%02x", path, i);
 		(dirs, cnt) := readdir->init(subdir, Readdir->NAME);
 		j := 0;
 		while(j < cnt){
@@ -108,7 +108,7 @@ checkfile(path: string, flag: int)
 	else if(filetype == "commit")
 		checkcommit(path, filebuf, flag);
 	else
-		sys->fprint(stderr, "Error in file format: %s\n",filetype);
+		error(sprint("Error in file format: %s\n",filetype));
 }
 
 #flag 1 is for found
@@ -168,7 +168,7 @@ checkcommit(path: string, commitbuf: array of byte, flag: int)
 printlist(msg: string, l: list of ref Object)
 {
 	while(l != nil){
-		sys->print("%s %s\n", (hd l).name, msg);
+		debugmsg(sprint("%s %s\n", (hd l).name, msg));
 		l = tl l;
 	}
 }

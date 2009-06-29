@@ -6,6 +6,7 @@ include "draw.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
 
 include "tables.m";
 	tables: Tables;
@@ -18,6 +19,7 @@ Iobuf: import bufio;
 	
 include "utils.m";
 	utils: Utils;
+debugmsg, error: import utils;
 
 include "gitindex.m";
 	gitindex: Gitindex;
@@ -26,13 +28,12 @@ Index, Entry: import gitindex;
 include "sh.m";	
 
 index: ref Index;	
-stderr: ref Sys->FD;
 
 REPOPATH: string;	
 	
 diff: Command;
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
@@ -40,10 +41,9 @@ init(args: list of string)
 	tables = load Tables Tables->PATH;
 
 	REPOPATH = hd args;
-	utils->init(REPOPATH);
-	index = Index.new(REPOPATH);
+	utils->init(REPOPATH, debug);
+	index = Index.new(REPOPATH, debug);
 	index.readindex(utils->INDEXPATH);
-	stderr = sys->fildes(2);
 	showdiffs();
 }
 
@@ -53,16 +53,16 @@ showdiffs()
 		if(filechanged(hd l))
 			showdiff(hd l);
 		else
-			sys->print("File %s wasn't changed\n", (hd l).name);
+			error(sprint("File %s wasn't changed\n", (hd l).name));
 	}
 }
 
 filechanged(entry: ref Entry): int
 {
-	sys->print("name is: %s\n", entry.name);
+	debugmsg(sprint("name is: %s\n", entry.name));
 	(ret, dirstat) := sys->stat(REPOPATH + entry.name);
 	if(ret == -1){
-		sys->fprint(stderr, "File stat failed: %r\n");
+		error(sprint("File stat failed: %r\n"));
 		return 0;
 	}
 	return (!utils->equalqids(entry.qid, dirstat.qid) ||

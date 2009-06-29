@@ -4,6 +4,7 @@ include "write-tree.m";
 
 include "sys.m";
 	sys: Sys;
+sprint: import sys;
 
 include "tables.m";
 	tables: Tables;
@@ -15,7 +16,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-int2string, bufsha1, save2file, string2path, sha2string, SHALEN, INDEXPATH: import utils;
+debugmsg, error, int2string, bufsha1, save2file, string2path, sha2string, SHALEN, INDEXPATH: import utils;
 
 include "gitindex.m";
 	gitindex: Gitindex;
@@ -32,8 +33,9 @@ index: ref Index;
 REPOPATH: string;
 
 outfd: ref Sys->FD;
+debug: int;
 
-init(args: list of string)
+init(args: list of string, deb: int)
 {
 	sys = load Sys Sys->PATH;
 	deflate = load Filter Filter->DEFLATEPATH;
@@ -42,24 +44,25 @@ init(args: list of string)
 	stringmodule = load String String->PATH;
 
 	REPOPATH = hd args;
-	utils->init(REPOPATH);
+	debug = deb;
+	utils->init(REPOPATH, debug);
 	deflate->init();
 	gitindex = load Gitindex Gitindex->PATH;
 	outfd = sys->create("output", Sys->OWRITE, 8r644);
-	sys->print("new tree: %s\n", writetree());
+	debugmsg(sprint("new tree: %s\n", writetree()));
 }
 
 writetree(): string
 {
-	index = Index.new(REPOPATH);
+	index = Index.new(REPOPATH, debug);
 	index.readindex(INDEXPATH);
 
 	l := mergesort(index.entries.all());
-	sys->print("files:\n");
+	debugmsg("files:\n");
 	l1 := l;
 	while(l1 != nil)
 	{
-		sys->print("file: %s\n", (hd l1).name);
+		debugmsg(sprint("file: %s\n", (hd l1).name));
 		l1 = tl l1;
 	}
 	return sha2string(writetreefile(l, "").t0);
@@ -79,7 +82,7 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 		sha1 := entry.sha1;
 		name := entry.name;
 		rest: string;
-		sys->print("name is: %s; mode is %d; sha1 is %s\n", name,mode,sha2string(sha1));
+		debugmsg(sprint("name is: %s; mode is %d; sha1 is %s\n", name,mode,sha2string(sha1)));
 		(name, rest) = stringmodule->splitl(name[len basename:], "/");
 		mode |= 32768;
 		if(rest != "")
@@ -89,7 +92,7 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 			mode = mode | 16384;
 
 		}
-		record := array of byte sys->sprint("%o %s", mode, name);
+		record := array of byte sprint("%o %s", mode, name);
 		sys->write(sys->fildes(1), record, len record);
 		temp := array[len record + 1 + SHALEN] of byte;
 		temp[:] = record;
@@ -103,12 +106,12 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 		}
 		filelist[offset:] = temp;
 		offset += len temp;
-		sys->print("mode is %o\n", mode);
+		debugmsg(sprint("mode is %o\n", mode));
 		if(entrylist != nil)
 			entrylist = tl entrylist;
 	}
 
-	sys->print("size is: %d\n", offset);
+	debugmsg(sprint("size is: %d\n", offset));
 	header := sys->sprint("tree %d", offset);
 	headerlen := len array of byte header;
 

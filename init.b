@@ -25,7 +25,7 @@ INDEXPATH, OBJECTSTOREPATH, SHALEN: import Utils;
 
 REPOPATH: string;
 
-init(args: list of string)
+init(args: list of string, debug: int)
 {
 	sys := load Sys Sys->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
@@ -36,7 +36,7 @@ init(args: list of string)
 	REPOPATH = hd args;
 	sys->print("Initializing git repo\n");
 
-	Index.new(REPOPATH);
+	Index.new(REPOPATH, debug);
 
 	header := Header.new();
 	temp := header.unpack()[:HEADERSZ - SHALEN];

@@ -17,7 +17,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-SHALEN, readsha1file, string2path, sha2string, INDEXPATH: import utils;
+error, SHALEN, readsha1file, string2path, sha2string, INDEXPATH: import utils;
 
 include "gitindex.m";
 	gitindex: Gitindex;
@@ -31,8 +31,9 @@ index: ref Index;
 
 REPOPATH: string;
 
+debug: int;
 
-init(args: list of string)
+init(args: list of string, deb: int)
 {
 	sys = load Sys Sys->PATH;	
 	utils = load Utils Utils->PATH;
@@ -42,7 +43,8 @@ init(args: list of string)
 	stringmodule = load String String->PATH;
 
 	REPOPATH = hd args;
-	utils->init(REPOPATH);
+	debug = deb;
+	utils->init(REPOPATH, debug);
 	if(len args != 2)
 		usage();
 
@@ -51,7 +53,7 @@ init(args: list of string)
 
 readtree(path: string)
 {
-	index = Index.new(REPOPATH);
+	index = Index.new(REPOPATH, debug);
 	readtreefile(path, "");
 	index.writeindex(INDEXPATH);
 }
@@ -87,7 +89,7 @@ readtreefile(path: string, basename: string)
 
 usage()
 {
-	sys->fprint(sys->fildes(2), "usage: read-tree <tree-sha>\n");
+	error("usage: read-tree <tree-sha>\n");
 	exit;
 }
 
