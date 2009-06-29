@@ -1,17 +1,8 @@
 .TH GitFS 4 
 .SH Name
-gitfs \- file server for git scm
+gitfs \- File server interface to Git scm
 .SH Synopsis
-mount {gitfs srcdir} 
-[
-.BI -m " mountpoint"
-] 
-[
-.BI -c " configfile"
-]
-[
-.BI -h " repository"
-]
+mount {gitfs [-d] repo} mntpt
 .SH Description
 .B gitfs
 is a file server that represents git repository. Git commands are executed by writing them into the 
@@ -23,27 +14,21 @@ file.
 There's no "interactive" mode for 
 .I git-commit. 
 Commit message should be written to 
-.I ctl
+.I data 
 file, 
-or another file. 
 .PP
-.I git-add
-command doesn't have interactive mode yet. 
+Interactive add is done through utility called git/add, as stdin is used
+by Styxserver. All operations with git/add works as some kind of shell for ctl.
 .PP
-Objects located in objects can be read as ordinary files. Results are the same
-as 
-.I git-show
-command is executed.
+Objects located in objects can be read as ordinary files. Result of reading files under
+objects/ directory is the same as you could get from 
+.I git cat-file
 .SH Options 
 .TP
-.BI -m " mountpoint"
-Mountpoint is point where to mount file server. By default it mounts to /n/git.
+.BI -d 
+is used to see messages from fileserver
 .TP
-.BI -c " configfile"
-Config file that can contain settings for repository.
-.TP
-.BI -h " repository"
-Path to repository. By default it searches for .git directory in the path 
+repo is path to git repository. By default it searches for .git directory in the path 
 from current directory upto the /.
 .SH Hierarchy
 .TP
@@ -52,6 +37,9 @@ File that contains log. If you want to use options for git-log
 you can write options to ctl file and get results from data file.
 This file contains unfiltered log of the repository, i.e. it's the same
 what git-log does by default.
+.TP
+.B /status
+File that is substitution for git-status command.
 .TP
 .B /tags
 Directory, which contains tags. 
@@ -68,7 +56,7 @@ This directory object store associated with the repository. Each subdirectory co
 of the repository.
 .TP
 .B /files/*
-This directory contains the files from the srcdir. 
+This directory contains the files from repo/ directory. 
 .TP
 .B /ctl
 File that's used for operating with git. Commands can be send are: commit, gc, add, branch, reset, status, checkout, merge, rm.
@@ -78,18 +66,55 @@ Results of executed commands in the
 .I ctl
 file are stored here.	
 .SH Examples
+.B Mounting fileserver and reading logs
+.LP
 Mount git repository and read the unfiltered log file.
-.PP	
-mount {gitfs dir} mntpt
-cat mntpt/log
-unmount mntpt	
-.PP
+.nf
+$ mount {gitfs .} mntpt
+$ cat mntpt/log
+<some log>
+$ unmount mntpt	
+.fi
+.LP
 The same as above but with filtering and getting log for the last 2 weeks
-.PP
-echo 'log --since=2 weeks ago' > ctl
-cat git_repo/data
+.nf
+$ echo 'log --since=2 weeks ago' > ctl
+$ cat git_repo/data
+<some log>
+.fi
+.LP
+.B Simple commits.
+.LP
+.nf
+Commit message is read from data file
+$ echo checkout > ctl
+# ...Some editing...
+$ echo add file1 > ctl
+$ echo rm file2 > ctl
+$ echo commit > ctl
+.fi
+.LP
+.B Merges
+.LP
+.nf
+$ echo merge branchname > ctl
+.LP
+Result of merge is read from data file.
+After resolving conflict you can add and commit:
+.LP
+$ echo add file1 > ctl
+$ echo commit > ctl
+.LP
+.B Differences between trees and files
+.LP
+.nf
+$ echo diff-tree <treeish1> <treeish2> > ctl
+
+Difference between index and working directory
+
+$ echo show-diff > ctl
+.fi
 .SH Source
+gitfs.b
 .SH See also
 .SH Bugs	
-
-
