@@ -54,6 +54,8 @@ Gitindex: import indexparser;
 debug: int;
 stderr: ref Sys->FD;
 
+hunkymunkyfid: int;
+
 srv: ref Styxserver;
 nav: ref Navigator;
 
@@ -70,6 +72,11 @@ Item: adt{
 	data: array of byte;
 };
 
+Fidqid: adt{
+	fid: int;
+	qid: big;
+};
+
 Head: adt{
 	name, sha1: string;
 };
@@ -77,7 +84,7 @@ Head: adt{
 table, shatable: ref Strhash[ref Item];
 REPOPATH: string;
 
-pwds: list of big;
+pwds: list of ref Fidqid;
 
 Gitfs: module
 {
@@ -122,6 +129,7 @@ init(nil: ref Draw->Context, args: list of string)
 	
 
 	inittable();
+ 	pwds = ref Fidqid(-1, QRoot) :: pwds;
 
 	styx->init();
 	styxservers->init(styx);
@@ -347,6 +355,16 @@ mainloop:
 				#some code for processing writing
 				srv.reply(ref Rmsg.Write(m.tag, cnt));
 			
+			Walk => 
+				fid := srv.getfid(m.fid);
+				pwds = ref Fidqid(m.newfid, fid.path) :: pwds;
+				srv.default(m);
+			Clunk =>
+				debugmsg(sprint("In Clunk %d; hd pwds is %d\n", m.fid, (hd pwds).fid));
+				while(pwds != nil && (hd pwds).fid == m.fid){
+					pwds = tl pwds;
+				}
+				srv.default(m);
 			* => srv.default(gm);
 		}
 	}
@@ -362,22 +380,22 @@ mainloop:
 			Stat =>
 				debugmsg("in stat:\n");
 				if(navop.path == big QRoot)
-					pwds = big QRoot :: nil;
+					;#pwds = ref (-1, QRoot) :: nil;
 				item := table.find(string navop.path);
 				navop.reply <-= (item.dirstat, "");	
 
 			Walk =>
 				debugmsg(sprint("in walk: %s\n", navop.name));
-				(name1, name2) := basename(navop.name);
-				debugmsg(sprint("name is %s == %s\n", name1, name2));
 				if(navop.name == ".."){
-					pwds = tl pwds;
-					item := table.find(string hd pwds);
+					if(len pwds > 1)
+						pwds = tl pwds;
+					item := table.find(string (hd pwds).qid);
 					navop.reply <-= (item.dirstat, nil);
 					continue mainloop;
 				}
 			
-				for(l := findchildren(hd pwds); l != nil; l = tl l){
+				debugmsg(sprint("cur path is %bd\n", (hd pwds).qid));
+				for(l := findchildren(navop.path); l != nil; l = tl l){
 					debugmsg("navigate/walk forloop\n");
 					item := hd l;
 					dirstat := item.dirstat;
@@ -388,7 +406,7 @@ mainloop:
 						debugmsg("matching in walking\n");
 						if(dirstat.qid.qtype & Sys->QTDIR){
 							debugmsg("dir is matched\n");
-							pwds = item.qid :: pwds;
+							#pwds = (fid.fid, navop.path) :: pwds;
 						}
 						navop.reply <-= (dirstat, nil);
 						continue mainloop;
@@ -568,7 +586,7 @@ createlogstat(parentitem: ref Item, dirstat: ref Sys->Dir, msg: string)
 findchildren(parentqid: big): list of ref Item
 {
 	item := table.find(string parentqid);
-	if(item.children == nil && parentqid < QIndex && parentqid > QIndex3){
+	if(item.children == nil && (parentqid < QIndex || parentqid > QIndex3)){
 		debugmsg(sprint("not filled %bd\n", parentqid));
 		readchildren(item.sha1, parentqid);
 	}
@@ -586,7 +604,7 @@ findchildren(parentqid: big): list of ref Item
 
 		l = tl l;
 	}
-	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, hd pwds));
+	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, (hd pwds).qid));
 	return children; 
 }
 
@@ -638,11 +656,11 @@ basename(path: string): (string, string)
 	return (nil, path);
 }
 
-printlist(l: list of ref Item)
+printlist(l: list of ref Fidqid)
 {
 	print("-----------------------\n");
 	while(l != nil){
-		print("%s ", (hd l).dirstat.name);
+		print("===> %d ==  %bd", (hd l).fid, (hd l).qid);
 		l = tl l;
 	}
 	print("-----------------------\n");
