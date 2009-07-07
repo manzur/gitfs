@@ -235,6 +235,7 @@ fillindexdir(parent: ref Item, stage: int)
 
 				(dirname, rest) = basename(rest);
 			}
+			dirstat = sys->stat(string2path(sha1)).t1;
 			item = ref Item(q, nil, makefilestat(q, rest, dirstat), sha1, nil);
 			parent.children = item.qid :: parent.children;
 			table.add(string q, item);
@@ -366,7 +367,9 @@ mainloop:
 				navop.reply <-= (item.dirstat, "");	
 
 			Walk =>
-				debugmsg("in walk\n");
+				debugmsg(sprint("in walk: %s\n", navop.name));
+				(name1, name2) := basename(navop.name);
+				debugmsg(sprint("name is %s == %s\n", name1, name2));
 				if(navop.name == ".."){
 					pwds = tl pwds;
 					item := table.find(string hd pwds);
@@ -382,7 +385,9 @@ mainloop:
 						dirstat = ref sys->stat(string2path(item.sha1)).t1;
 
 					if(dirstat.name == navop.name){
+						debugmsg("matching in walking\n");
 						if(dirstat.qid.qtype & Sys->QTDIR){
+							debugmsg("dir is matched\n");
 							pwds = item.qid :: pwds;
 						}
 						navop.reply <-= (dirstat, nil);
@@ -394,11 +399,7 @@ mainloop:
 			Readdir =>
 				debugmsg(sprint("in readdir: %bd\n", navop.path));
 				item := table.find(string navop.path);
-				if(item.children == nil){
-					debugmsg("not filled\n");
-					readchildren(item.sha1, navop.path);
-				}
-				children := findchildren(navop.path);
+					children := findchildren(navop.path);
 				while(children != nil && navop.offset-- > 0){
 					children = tl children;
 				}
@@ -567,6 +568,11 @@ createlogstat(parentitem: ref Item, dirstat: ref Sys->Dir, msg: string)
 findchildren(parentqid: big): list of ref Item
 {
 	item := table.find(string parentqid);
+	if(item.children == nil && parentqid < QIndex && parentqid > QIndex3){
+		debugmsg(sprint("not filled %bd\n", parentqid));
+		readchildren(item.sha1, parentqid);
+	}
+
 	if(item == nil)	
 		return nil;
 
@@ -580,6 +586,7 @@ findchildren(parentqid: big): list of ref Item
 
 		l = tl l;
 	}
+	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, hd pwds));
 	return children; 
 }
 
