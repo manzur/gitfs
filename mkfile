@@ -14,6 +14,7 @@ TARG=\
 	gitfs.dis\
 	read-tree.dis\
 	show-diff.dis\
+	indexparser.dis\
 	update-index.dis\
 	utils.dis\
 	write-tree.dis
@@ -25,6 +26,7 @@ SYSMODULES=\
 	log.m\
 	update-index.m\
 	init.m\
+	indexparser.m\
 	write-tree.m\
 	utils.m
 

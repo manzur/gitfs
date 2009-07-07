@@ -1,8 +1,8 @@
-implement Myfs;
+implement Gitfs;
 
 include "sys.m";
 	sys: Sys;
-sprint: import sys;
+sprint, print: import sys;
 
 include "draw.m";	
 
@@ -45,25 +45,28 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-debugmsg, error, SHALEN, string2path, sha2string, HEADSPATH, OBJECTSTOREPATH: import utils;
+debugmsg, error, SHALEN, string2path, sha2string, INDEXPATH, HEADSPATH, OBJECTSTOREPATH: import utils;
 
+include "indexparser.m";
+	indexparser: Indexparser;
+Gitindex: import indexparser;
+	
 debug: int;
 stderr: ref Sys->FD;
 
 srv: ref Styxserver;
 nav: ref Navigator;
 
-QRoot, QRootCtl, QRootData, QRootLog, QRootConfig, QRootExclude, QRootObjects, QRootFiles, QStaticMax: con big iota;
+QRoot, QRootCtl, QRootData, QRootLog, QRootConfig, QRootExclude, QRootObjects, QRootFiles, QIndex, QIndex1, QIndex2, QIndex3, QStaticMax: con big iota;
 INITSIZE: con 17;
 
 QMax := QStaticMax;
 
 Item: adt{
 	qid: big;
-	parentqid: big;
+	children: list of big;
 	dirstat: ref Sys->Dir;
 	sha1: string;
-	filled: int;
 	data: array of byte;
 };
 
@@ -74,9 +77,9 @@ Head: adt{
 table, shatable: ref Strhash[ref Item];
 REPOPATH: string;
 
-cwd := big 0;
+pwds: list of big;
 
-Myfs: module
+Gitfs: module
 {
 	init: fn(nil: ref Draw->Context, args: list of string);
 };
@@ -94,10 +97,10 @@ init(nil: ref Draw->Context, args: list of string)
 	tables = load Tables Tables->PATH;
 	stringmod = load String String->PATH;
 	gwd = load Workdir Workdir->PATH;
-
 	log = load Log Log->PATH;
 	catfile = load Catfile Catfile->PATH;
 	utils = load Utils Utils->PATH;
+	indexparser = load Indexparser Indexparser->PATH; 
 	
 	if(len args < 2)
 		usage();
@@ -111,6 +114,7 @@ init(nil: ref Draw->Context, args: list of string)
 
 	REPOPATH = makeabsolute(arg);
 	utils->init(REPOPATH, debug);
+	indexparser->init(REPOPATH :: nil, debug);
 
 	debugmsg(sprint("repopath: %s\n", REPOPATH));
 
@@ -163,33 +167,97 @@ inittable()
 	ret: int;
 	
 	heads := readheads(REPOPATH + HEADSPATH, "");
+	l: list of big;
 	while(heads != nil){
-		(ret, dirstat) = sys->stat(string2path((hd heads).sha1));
+		head := hd heads;
+		(ret, dirstat) = sys->stat(string2path(head.sha1));
 		if(ret == -1){
-			error(sprint("head %s couldn't be accessed\n", string2path((hd heads).sha1)));
+			error(sprint("head %s couldn't be accessed\n", string2path(head.sha1)));
 			continue;
 		}
 		q := QMax++;
-		dirstat.qid.path = q;
-		dirstat.qid.qtype |= Sys->QTDIR;
-		dirstat.mode = 8r755 | Sys->DMDIR;
-		dirstat.name = (hd heads).name;
-		elem := ref Item(q, QRoot, ref dirstat, (hd heads).sha1, 0, nil); 
-		table.add(string q, elem);
-		shatable.add(elem.sha1, elem);
+		l = q :: l;
+		item := ref Item(q, nil, makedirstat(q, head.name, dirstat), head.sha1, nil); 
+		table.add(string q, item);
+		shatable.add(item.sha1, item);
 		heads = tl heads;
 	}
 
-	uid := dirstat.uid;
-	gid := dirstat.gid;
-	atime := dirstat.atime;
-	mtime := dirstat.mtime;
+	d := ref Item(QRoot, nil, makedirstat(QRoot, ".", dirstat), nil, nil); 
+	table.add(string QRoot, d);
 
-	qid := Sys->Qid(QRoot, 0, Sys->QTDIR);
-	dirstat = Sys->Dir(".", uid, gid, "", qid, 8r755|Sys->DMDIR, atime, mtime, big 0, 0, 0);
-	droot := ref Item(QRoot, QRoot, ref dirstat, nil, 1, nil); 
-	table.add(string QRoot, droot);
+	while(l != nil){
+		d.children = (hd l):: d.children;
+		l = tl l;
+	}
+	d.children = QIndex :: d.children; 
 
+	#Adding index/ and subdirs
+	d = ref Item(QIndex, nil, makedirstat(QIndex, "index", dirstat), nil, nil);
+	table.add(string QIndex, d);
+	d.children = QIndex1 :: (QIndex2 :: (QIndex3 :: d.children));
+	fillindexdir(d, 0);
+
+	d = ref Item(QIndex1, nil, makedirstat(QIndex1, "1", dirstat), nil, nil);
+	table.add(string QIndex1, d);
+	fillindexdir(d, 1);
+
+	d = ref Item(QIndex2, nil, makedirstat(QIndex2, "2", dirstat), nil, nil);
+	table.add(string QIndex2, d);
+	fillindexdir(d, 2);
+	
+	d = ref Item(QIndex3, nil, makedirstat(QIndex3, "3", dirstat), nil, nil);
+	table.add(string QIndex3, d);
+	fillindexdir(d, 3);
+}
+
+fillindexdir(parent: ref Item, stage: int)
+{
+	index := indexparser->readindex(stage);
+	dirstat := sys->stat(REPOPATH + INDEXPATH).t1;
+	for(i := 0; i < len index.entries; i++){
+		sha1 := sha2string(index.entries[i].sha1);
+		item := shatable.find(sha1);
+		if(item == nil){
+			q := QMax++;
+			(dirname, rest) := basename(index.entries[i].name);
+			while(dirname != nil){
+				item1 := child(parent, dirname);
+				if(item1 == nil){
+					item1 = ref Item(q, nil, makedirstat(q, dirname, dirstat), nil, nil);
+					table.add(string item1.qid, item1);
+					parent.children = q :: parent.children;
+					parent = item1;
+					q = QMax++;
+				}
+				else
+					parent = item1;
+
+				(dirname, rest) = basename(rest);
+			}
+			item = ref Item(q, nil, makefilestat(q, rest, dirstat), sha1, nil);
+			parent.children = item.qid :: parent.children;
+			table.add(string q, item);
+			shatable.add(sha1, item);
+		}
+		else{
+			parent.children = item.qid :: parent.children;
+		}
+	}
+}
+
+child(parent: ref Item, name: string): ref Item
+{
+	l := parent.children;
+	item: ref Item;
+	while(l != nil){
+		item = table.find(string hd l);
+		if(item != nil && item.dirstat.name == name)
+			break;
+		l = tl l;
+	}
+	
+	return item;
 }
 
 process(srv: ref Styxserver, tmsgchan: chan of ref Tmsg)
@@ -212,13 +280,13 @@ mainloop:
 				fid := srv.getfid(m.fid); 
 				item := table.find(string fid.path);
 				buf := array[m.count] of byte;
+
 				if(fid.qtype == Sys->QTDIR){
 					srv.read(m);
 				}
 				else if(item.dirstat.name == "log"){
 					logch := chan of array of byte;
-					parent := table.find(string item.parentqid);
-					head := parent.sha1;
+					head := item.sha1; 
 					debugmsg(sprint("REPOPATH = %s; head is %s\n", REPOPATH, head));
 
 					spawn log->init(logch, REPOPATH :: head :: nil, debug);
@@ -256,13 +324,13 @@ mainloop:
 					srv.reply(styxservers->readbytes(m, buf));
 				}
 				else{
-					item1 := table.find(string fid.path);
-					if(item1.data != nil){
-						srv.reply(styxservers->readbytes(m, item1.data));
+					item := table.find(string fid.path);
+					if(item.data != nil){
+						srv.reply(styxservers->readbytes(m, item.data));
 						continue mainloop;
 					}
 
-					path := item1.sha1;
+					path := item.sha1;
 					catch := chan of array of byte;
 					
 					spawn catfile->init(REPOPATH, 0, path, catch, debug);
@@ -288,62 +356,61 @@ navigate(navch: chan of ref Navop)
 {
 mainloop:
 	while(1){
-	pick navop := <-navch
-	{
-		Stat =>
+		pick navop := <-navch
+		{
+			Stat =>
 				debugmsg("in stat:\n");
 				if(navop.path == big QRoot)
-					cwd = big 0;
+					pwds = big QRoot :: nil;
 				item := table.find(string navop.path);
 				navop.reply <-= (item.dirstat, "");	
 
-		Walk =>
-			debugmsg("in walk\n");
-			if(navop.name == ".."){
-				item := table.find(string cwd);
-				item1 := table.find(string item.parentqid);
-				debugmsg(sprint("%bd; want to step up?%d\n", cwd, item1 == nil));
-				navop.reply <-= (item1.dirstat, nil);
-				cwd = item1.qid;
-				continue mainloop;
-			}
-			
-			debugmsg(sprint("parent is %bd\n", cwd));
-			for(l := findchildren(cwd); l != nil; l = tl l){
-				debugmsg("navigate/walk forloop\n");
-				dirstat := (hd l).dirstat;
-				if(dirstat == nil)
-					dirstat = ref sys->stat(string2path((hd l).sha1)).t1;
-
-				debugmsg(sprint("WALKING %s; %s\n", navop.name, dirstat.name));
-				if(dirstat.name == navop.name){
-					if(dirstat.qid.qtype & Sys->QTDIR){
-						cwd = (hd l).qid;
-						debugmsg(sprint("parent is %bd\n", cwd));
-					}
-					navop.reply <-= (dirstat, nil);
+			Walk =>
+				debugmsg("in walk\n");
+				if(navop.name == ".."){
+					pwds = tl pwds;
+					item := table.find(string hd pwds);
+					navop.reply <-= (item.dirstat, nil);
 					continue mainloop;
 				}
-			}
-			navop.reply <-= (nil, "not found");
+			
+				for(l := findchildren(hd pwds); l != nil; l = tl l){
+					debugmsg("navigate/walk forloop\n");
+					item := hd l;
+					dirstat := item.dirstat;
+					if(dirstat == nil)
+						dirstat = ref sys->stat(string2path(item.sha1)).t1;
 
-		Readdir =>
-			debugmsg("in readdir\n");
-			item := table.find(string navop.path);
-			if(!item.filled){
-				readchildren(item.sha1, navop.path);
-				item.filled = 1;
-			}
-			children := findchildren(navop.path);
-			while(children != nil && navop.offset-- > 0){
-				children = tl children;
-			}
-			while(children != nil && navop.count++ > 0){					
-				navop.reply <-= ((hd children).dirstat, nil);
-				children = tl children;
-			}
-			navop.reply <-= (nil, nil);
-	}
+					if(dirstat.name == navop.name){
+						if(dirstat.qid.qtype & Sys->QTDIR){
+							pwds = item.qid :: pwds;
+						}
+						navop.reply <-= (dirstat, nil);
+						continue mainloop;
+					}
+				}
+				navop.reply <-= (nil, "not found");
+
+			Readdir =>
+				debugmsg(sprint("in readdir: %bd\n", navop.path));
+				item := table.find(string navop.path);
+				if(item.children == nil){
+					debugmsg("not filled\n");
+					readchildren(item.sha1, navop.path);
+				}
+				children := findchildren(navop.path);
+				while(children != nil && navop.offset-- > 0){
+					children = tl children;
+				}
+				count := navop.count;
+				while(children != nil && count-- > 0){					
+					navop.reply <-= ((hd children).dirstat, nil);
+					debugmsg("WTFFFF\n");
+					children = tl children;
+				}
+				debugmsg("aADASD\n");
+				navop.reply <-= (nil, nil);
+		}
 	}
 }
 
@@ -374,9 +441,7 @@ makeabsolute(path: string): string
 		name[len name] = path[i];
 	}
 
-	debugmsg(sprint("curpath: %s; name: %s\n", curpath, name));
 	curpath = resolvepath(curpath, name);
-	debugmsg(sprint("curpath: %s; name: %s\n", curpath, name));
 
 	if(curpath != nil && curpath[len curpath - 1] != '/'){
 		curpath += "/";
@@ -408,10 +473,10 @@ resolvepath(curpath: string, path: string): string
 
 readchildren(sha1: string, parentqid: big)
 {
-	(filetype, filesize, filebuf) :=  utils->readsha1file(sha1);
-	debugmsg(sprint("FILETYPE: %s\n", filetype));
-	if(filetype == "commit"){
 
+	(filetype, filesize, filebuf) :=  utils->readsha1file(sha1);
+	parentitem := table.find(string parentqid);
+	if(filetype == "commit"){
 		ibuf := bufio->aopen(filebuf);
 		s := ibuf.gets('\n');
 		s = s[:len s - 1];
@@ -420,79 +485,102 @@ readchildren(sha1: string, parentqid: big)
 		(s, sha) = stringmod->splitl(s, " ");
 		sha = sha[1:];
 
-		q := big QMax++;
+		q := QMax++;
+		item := shatable.find(sha);
 		dirstat := (sys->stat(string2path(sha))).t1;
-		item := ref Item(q, parentqid, makedirstat(q, "tree", dirstat), sha, 0, nil);
-		table.add(string q, item);
-		shatable.add(item.sha1, item);
+		if(item == nil){
+			item = ref Item(q, nil, makedirstat(q, "tree", dirstat), sha, nil);
+			table.add(string q, item);
+			shatable.add(item.sha1, item);
+		}
+		
+		parentitem.children = item.qid :: parentitem.children;
 
 		parents := "";
 		pnum := 1;
 		while((s = ibuf.gets('\n')) != ""){
-			(recordtype, parent) := stringmod->splitl(s, " ");
-			debugmsg(sprint("recordtype: %s==\n", recordtype));
+			recordtype: string;
+			(recordtype, sha) = stringmod->splitl(s, " ");
 			if(recordtype != "parent")
 				break;
-			parent = parent[1:];
-			parent = parent[:len parent - 1];
+			sha = sha[1:len sha - 1];
+			item = shatable.find(sha);
+			#FIXME: Code for reusing commits should be added(if that commit has a tag).
 			q = QMax++;
-			debugmsg(sprint("I ADDED PARENT: %s\n", parent));
-			dirstat = (sys->stat(string2path(parent))).t1;
-			item = ref Item(q, parentqid, makedirstat(q, "parent" + string pnum++, dirstat), parent, 0, nil);
+			dirstat = (sys->stat(string2path(sha))).t1;
+			item = ref Item(q, nil, makedirstat(q, "parent" + string pnum++, dirstat), sha, nil);
 			table.add(string q, item) ;
 			shatable.add(item.sha1, item);
+			parentitem.children = item.qid :: parentitem.children;
 		}
-
-		debugmsg(sprint("parents is %s\n\n", parents));
-
 
 		msg := s;
 		while((s = ibuf.gets('\n')) != ""){
 			msg += s;
 		}
 
-		q = QMax++;
-		item = ref Item(big q, parentqid, makefilestat(q, "commit_msg", dirstat), "", 1, sys->aprint("%s", msg));
-		table.add(string q, item);
-
-		#Adding log entry
-		q = QMax++;
-		item = ref Item(q, parentqid, makefilestat(q, "log", dirstat), "", 1, nil);
-		table.add(string q, item);
+		createlogstat(parentitem, ref dirstat, msg);
 	}
 	else if(filetype == "tree"){
 		debugmsg("file tteee\n");
 		ibuf := bufio->aopen(filebuf);
-		while((s := ibuf.gets('\0'))!= "" ){
+
+		while((s := ibuf.gets('\0'))!= ""){
+			debugmsg("ASDASDASD\n");
 			q := QMax++;
 			sha := array[SHALEN] of byte;
 			ibuf.read(sha, SHALEN);
 			shastr := sha2string(sha);
-			dirstat := ref (sys->stat(string2path(shastr))).t1; 
-			s = s[:len s - 1];
-			(mode, name) := stringmod->splitl(s, " ");
-			name = name[1:];
-			dirstat.name = name; 
-			dirstat.qid.path = q;
-			item := ref Item(q, parentqid, dirstat, shastr, 0, nil);
-			table.add(string q, item);
-			shatable.add(item.sha1, item);
+			item := shatable.find(shastr);
+			if(item == nil){
+				dirstat := sys->stat(string2path(shastr)).t1; 
+				s = s[:len s - 1];
+				(mode, name) := stringmod->splitl(s, " ");
+				name = name[1:];
+				dirstat.name = name; 
+				debugmsg("ININININIF\n");
+				dirstat.qid.path = q;
+				item = ref Item(q, nil, ref dirstat, shastr, nil);
+				table.add(string q, item);
+				shatable.add(item.sha1, item);
+				debugmsg("YYYYY\n");
+			}
+			parentitem.children = item.qid :: parentitem.children;
 		}
 	}
 }
 
+createlogstat(parentitem: ref Item, dirstat: ref Sys->Dir, msg: string)
+{
+	q := QMax++;
+	item := ref Item(q, nil, makefilestat(q, "commit_msg", *dirstat), "", sys->aprint("%s", msg));
+	table.add(string q, item);
+	parentitem.children = item.qid :: parentitem.children;
+
+	#Adding log entry
+	q = QMax++;
+	item = ref Item(q, nil, makefilestat(q, "log", *dirstat), parentitem.sha1, nil);
+	table.add(string q, item);
+	parentitem.children = item.qid :: parentitem.children;
+}
+
 findchildren(parentqid: big): list of ref Item
 {
-	l := table.all();
-	l1: list of ref Item = nil;
+	item := table.find(string parentqid);
+	if(item == nil)	
+		return nil;
+
+	children: list of ref Item;
+	l := item.children;
 	while(l != nil){
-		elem := hd l;
-		if(elem.parentqid == parentqid)
-			l1 = (hd l) :: l1;
+		item1 := table.find(string hd l);
+		if(item1 != nil){
+			children = item1 :: children; 
+		}
+
 		l = tl l;
 	}
-
-	return l1; 
+	return children; 
 }
 
 makefilestat(q: big, name: string, src: Sys->Dir): ref Sys->Dir
@@ -515,4 +603,40 @@ makedirstat(q: big, name: string, src: Sys->Dir): ref Sys->Dir
 	dirstat.mode |= Sys->DMDIR | 8r755;
 
 	return dirstat;
+}
+
+convertpath(path: string): string
+{
+	ret := "";
+	for(i := 0; i < len path; i++){
+		c := path[i];
+		if(c == '/')
+			c = '+';
+		ret[i] = c;
+	}
+
+	return ret;
+}
+
+basename(path: string): (string, string)
+{
+	if(path[0] == '/')
+		path = path[1:];
+
+	for(i := 0; i < len path; i++){
+		if(path[i] == '/')
+			return (path[:i], path[i+1:]);
+	}
+
+	return (nil, path);
+}
+
+printlist(l: list of ref Item)
+{
+	print("-----------------------\n");
+	while(l != nil){
+		print("%s ", (hd l).dirstat.name);
+		l = tl l;
+	}
+	print("-----------------------\n");
 }

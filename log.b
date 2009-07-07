@@ -125,7 +125,6 @@ getcommits(parents: list of ref Commit)
 		commit.parents = tl commit.parents;
 		parents = parent :: parents;
 	}
-	printlist(parents);
 
 	getcommits(parents);
 }
@@ -136,7 +135,6 @@ showlog(commit: ref Commit)
 
 	commits = lists->reverse(commits);
 	commits = commit :: commits;
- 	printlist(commits);
 
 	while(commits != nil){
 		commit = hd commits;

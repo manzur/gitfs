@@ -364,6 +364,27 @@ bytepos(a: array of byte, offset: int, delim: byte): int
 	return -1;
 }
 
+string2sha(sha1: string): array of byte
+{
+	ret := array[SHALEN] of byte;
+
+	for(i := 0; i < len ret; i++)
+		ret[i] = hex2byte(sha1[i * 2]) << 4 | hex2byte(sha1[i * 2 + 1]);
+
+	return ret;
+}
+
+hex2byte(val: int): byte
+{
+	if(val >= '0' && val <= '9')
+		return byte val;
+	
+	if(val >= 'A' && val <= 'F')	
+		return byte (val - 10);
+
+	return byte (val - 10);
+}
+
 debugmsg(msg: string)
 {
 	if(debug == 1)

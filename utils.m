@@ -31,6 +31,7 @@ Utils: module
 	save2file:     fn(path: string, buf: array of byte): int;
 	string2path:   fn(filename: string): string;
 	sha2string:    fn(sha: array of byte): string;
+	string2sha:    fn(sha1: string): array of byte;
 	exists:	       fn(shaname: string): int;
 
 	bytes2int:     fn(buf: array of byte, offset: int): int;

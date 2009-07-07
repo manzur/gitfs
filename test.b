@@ -22,6 +22,7 @@ splitr: import stringmod;
 
 include "utils.m";
 	utils: Utils;
+sha2string, string2sha: import utils;
 
 include "readdir.m";
 	readdir: Readdir;
@@ -64,10 +65,7 @@ init(nil : ref Draw->Context, args : list of string)
 	stringmod = load String String->PATH;
 	daytime = load Daytime Daytime->PATH;
 
-	tm := daytime->gmt(daytime->now());
-	tm.tzoff = 14400;
-	sys->print("%s\n", daytime->text(tm));
-	sys->print("%s\n", text(tm));
+	sys->print("%d\n", (nil :: (nil :: nil)) == nil);
 }
 
 text(tm: ref Tm): string
