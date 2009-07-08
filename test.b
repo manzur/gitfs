@@ -66,7 +66,14 @@ init(nil : ref Draw->Context, args : list of string)
 	daytime = load Daytime Daytime->PATH;
 
 	sys->print("%d\n", (nil :: (nil :: nil)) == nil);
+	s: string = nil;
+	pop := pop();
+	if(s == "a")
+		sys->print("a\n");
+	sys->print("%s\n", pop);
 }
+
+pop():string{return "POP";}
 
 text(tm: ref Tm): string
 {

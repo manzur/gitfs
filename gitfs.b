@@ -54,8 +54,6 @@ Gitindex: import indexparser;
 debug: int;
 stderr: ref Sys->FD;
 
-hunkymunkyfid: int;
-
 srv: ref Styxserver;
 nav: ref Navigator;
 
@@ -64,26 +62,39 @@ INITSIZE: con 17;
 
 QMax := QStaticMax;
 
-Item: adt{
-	qid: big;
-	children: list of big;
+#permanent part
+Shaobject: adt{
 	dirstat: ref Sys->Dir;
+	children: list of big;
 	sha1: string;
+	otype: string;
 	data: array of byte;
+};
+
+#modifiable part
+Direntry: adt{	
+	path: big;
+	name: string;
+	object: ref Shaobject;
+	parent: big;
+
+	getdirstat: fn(direntry: self ref Direntry): ref Sys->Dir;
 };
 
 Fidqid: adt{
 	fid: int;
-	qid: big;
+	path: big;
 };
 
 Head: adt{
 	name, sha1: string;
 };
 
-table, shatable: ref Strhash[ref Item];
+table: ref Strhash[ref Direntry];
+shatable: ref Strhash[ref Shaobject];
 REPOPATH: string;
 
+cwd, ppwd: big;
 pwds: list of ref Fidqid;
 
 Gitfs: module
@@ -108,7 +119,8 @@ init(nil: ref Draw->Context, args: list of string)
 	catfile = load Catfile Catfile->PATH;
 	utils = load Utils Utils->PATH;
 	indexparser = load Indexparser Indexparser->PATH; 
-	
+	gwd = load Workdir Workdir->PATH;
+
 	if(len args < 2)
 		usage();
 	
@@ -168,14 +180,16 @@ readheads(path, prefix: string): list of ref Head
 
 inittable()
 {
-	table = Strhash[ref Item].new(INITSIZE, nil);
-	shatable = Strhash[ref Item].new(INITSIZE, nil);
+	table = Strhash[ref Direntry].new(INITSIZE, nil);
+	shatable = Strhash[ref Shaobject].new(INITSIZE, nil);
 
+	direntry: ref Direntry;
 	dirstat: Sys->Dir;
+	l: list of big;
 	ret: int;
+	shaobject: ref Shaobject;
 	
 	heads := readheads(REPOPATH + HEADSPATH, "");
-	l: list of big;
 	while(heads != nil){
 		head := hd heads;
 		(ret, dirstat) = sys->stat(string2path(head.sha1));
@@ -185,88 +199,95 @@ inittable()
 		}
 		q := QMax++;
 		l = q :: l;
-		item := ref Item(q, nil, makedirstat(q, head.name, dirstat), head.sha1, nil); 
-		table.add(string q, item);
-		shatable.add(item.sha1, item);
+		shaobject = ref Shaobject(makedirstat(q, dirstat), nil, head.sha1, "commit", nil);
+		direntry = ref Direntry(q, head.name, shaobject, QRoot);
+		table.add(string direntry.path, direntry);
+		shatable.add(shaobject.sha1, shaobject);
 		heads = tl heads;
 	}
 
-	d := ref Item(QRoot, nil, makedirstat(QRoot, ".", dirstat), nil, nil); 
-	table.add(string QRoot, d);
-
-	while(l != nil){
-		d.children = (hd l):: d.children;
-		l = tl l;
-	}
-	d.children = QIndex :: d.children; 
+	shaobject = ref Shaobject(makedirstat(QRoot, dirstat), QIndex :: l, nil, nil, nil);
+	direntry = ref Direntry(QRoot, ".", shaobject, big -1);
+	table.add(string direntry.path, direntry);
 
 	#Adding index/ and subdirs
-	d = ref Item(QIndex, nil, makedirstat(QIndex, "index", dirstat), nil, nil);
-	table.add(string QIndex, d);
-	d.children = QIndex1 :: (QIndex2 :: (QIndex3 :: d.children));
-	fillindexdir(d, 0);
+	(ret, dirstat) = sys->stat(REPOPATH + INDEXPATH);
+	if(ret == -1)
+		error(sprint("Index file at %s is not found\n", REPOPATH + INDEXPATH));
 
-	d = ref Item(QIndex1, nil, makedirstat(QIndex1, "1", dirstat), nil, nil);
-	table.add(string QIndex1, d);
-	fillindexdir(d, 1);
+	dirstat = *makedirstat(QIndex, dirstat);
+	shaobject = ref Shaobject(ref dirstat, QIndex1 :: (QIndex2 :: (QIndex3 :: nil)), nil, "index", nil);
+	direntry = ref Direntry(QIndex, "index", shaobject, QRoot);
+	table.add(string direntry.path, direntry);
+	fillindexdir(direntry, 0);
 
-	d = ref Item(QIndex2, nil, makedirstat(QIndex2, "2", dirstat), nil, nil);
-	table.add(string QIndex2, d);
-	fillindexdir(d, 2);
+	shaobject = ref Shaobject(ref dirstat, nil, nil, "index", nil);
+	direntry = ref Direntry(QIndex1, "1", shaobject, QIndex);
+	table.add(string direntry.path, direntry);
+	fillindexdir(direntry, 1);
+
+	shaobject = ref Shaobject(ref dirstat, nil, nil, "index", nil);
+	direntry = ref Direntry(QIndex2, "2", shaobject, QIndex);
+	table.add(string direntry.path, direntry);
+	fillindexdir(direntry, 2);
 	
-	d = ref Item(QIndex3, nil, makedirstat(QIndex3, "3", dirstat), nil, nil);
-	table.add(string QIndex3, d);
-	fillindexdir(d, 3);
+	shaobject = ref Shaobject(ref dirstat, nil, nil, "index", nil);
+	direntry = ref Direntry(QIndex3, "3", shaobject, QIndex);
+	table.add(string direntry.path, direntry);
+	fillindexdir(direntry, 3);
 }
 
-fillindexdir(parent: ref Item, stage: int)
+fillindexdir(parent: ref Direntry, stage: int)
 {
 	index := indexparser->readindex(stage);
-	dirstat := sys->stat(REPOPATH + INDEXPATH).t1;
+	(ret, dirstat) := sys->stat(REPOPATH + INDEXPATH);
+	if(ret == -1){
+		error(sprint("Index file at %s is not found\n", REPOPATH + INDEXPATH));
+		return;
+	}
+
+	ppath := QIndex + big stage;
+	direntry: ref Direntry;
+	shaobject: ref Shaobject;
+
 	for(i := 0; i < len index.entries; i++){
 		sha1 := sha2string(index.entries[i].sha1);
-		item := shatable.find(sha1);
-		if(item == nil){
-			q := QMax++;
-			(dirname, rest) := basename(index.entries[i].name);
-			while(dirname != nil){
-				item1 := child(parent, dirname);
-				if(item1 == nil){
-					item1 = ref Item(q, nil, makedirstat(q, dirname, dirstat), nil, nil);
-					table.add(string item1.qid, item1);
-					parent.children = q :: parent.children;
-					parent = item1;
-					q = QMax++;
-				}
-				else
-					parent = item1;
-
-				(dirname, rest) = basename(rest);
+		q := QMax++;
+		(dirname, rest) := basename(index.entries[i].name);
+		while(dirname != nil){
+			child := child(parent, dirname);
+			if(child == nil){
+				shaobject = ref Shaobject(makedirstat(q, dirstat), nil, nil, nil, nil); 
+				child = ref Direntry(q, dirname, shaobject, ppath);
+				table.add(string child.path, child);
+				parent.object.children = child.path :: parent.object.children;
 			}
-			dirstat = sys->stat(string2path(sha1)).t1;
-			item = ref Item(q, nil, makefilestat(q, rest, dirstat), sha1, nil);
-			parent.children = item.qid :: parent.children;
-			table.add(string q, item);
-			shatable.add(sha1, item);
+			parent = child;
+			ppath = q;
+			q = QMax++;
+			(dirname, rest) = basename(rest);
 		}
-		else{
-			parent.children = item.qid :: parent.children;
-		}
+		dirstat = sys->stat(string2path(sha1)).t1;
+		shaobject = ref Shaobject(ref dirstat,nil,  sha1, "blob", nil);
+		direntry = ref Direntry(q, rest, shaobject, ppath);
+		parent.object.children = direntry.path :: parent.object.children;
+		table.add(string direntry.path, direntry);
+		shatable.add(sha1, shaobject);
 	}
 }
 
-child(parent: ref Item, name: string): ref Item
+child(parent: ref Direntry, name: string): ref Direntry
 {
-	l := parent.children;
-	item: ref Item;
+	ret: ref Direntry;
+	l := parent.object.children;
 	while(l != nil){
-		item = table.find(string hd l);
-		if(item != nil && item.dirstat.name == name)
+		ret = table.find(string hd l);
+		if(ret != nil && ret.name == name)
 			break;
 		l = tl l;
 	}
 	
-	return item;
+	return ret;
 }
 
 process(srv: ref Styxserver, tmsgchan: chan of ref Tmsg)
@@ -277,25 +298,47 @@ mainloop:
 			Stat => 
 				debugmsg("in process/stat\n");
 				fid := srv.getfid(m.fid); 
-				item := table.find(string fid.path);
-				if(item == nil || fid.qtype == Sys->QTDIR){
+				direntry := table.find(string fid.path);
+				if(direntry == nil || fid.qtype == Sys->QTDIR){
 					srv.stat(m);
 					continue mainloop;
 				}
-				srv.reply(ref Rmsg.Stat(m.tag, *item.dirstat));
+				srv.reply(ref Rmsg.Stat(m.tag, *direntry.getdirstat()));
 
+			Create =>
+				debugmsg("process/create\n");
+				fid := srv.getfid(m.fid);
+				sys->print("fid is %d; path is %bd\n", m.fid, fid.path);
+				direntry := table.find(string fid.path);
+				if(direntry != nil && direntry.object.otype == "index"){
+					sys->print("Adding %s ===>%bd\n", m.name, ppwd);
+					pwd := "/";
+					first := (hd tl pwds).fid;
+					second := (hd tl tl pwds).fid;
+					third := (hd tl tl tl pwds).fid;
+					sys->print("Full path is %d == %d == %d\n", first, second, third);
+					sys->print("Full path is %bd == %bd == %bd\n", srv.getfid(first).path, srv.getfid(second).path, srv.getfid(third).path);
+					srv.reply(ref Rmsg.Create(m.tag, Sys->Qid(big 11, 0, 0),512));
+					continue mainloop;
+				}
+				srv.default(m);
+	
 			Read =>
 				debugmsg("in process/read\n");
 				fid := srv.getfid(m.fid); 
-				item := table.find(string fid.path);
+				direntry := table.find(string fid.path);
 				buf := array[m.count] of byte;
+				ptype: string;
+				parent := table.find(string direntry.parent);
+				if(parent != nil)
+					ptype = parent.object.otype; 
 
 				if(fid.qtype == Sys->QTDIR){
 					srv.read(m);
 				}
-				else if(item.dirstat.name == "log"){
+				else if(ptype == "commit" && direntry.name == "log"){
 					logch := chan of array of byte;
-					head := item.sha1; 
+					head := direntry.object.sha1; 
 					debugmsg(sprint("REPOPATH = %s; head is %s\n", REPOPATH, head));
 
 					spawn log->init(logch, REPOPATH :: head :: nil, debug);
@@ -333,13 +376,13 @@ mainloop:
 					srv.reply(styxservers->readbytes(m, buf));
 				}
 				else{
-					item := table.find(string fid.path);
-					if(item.data != nil){
-						srv.reply(styxservers->readbytes(m, item.data));
+					direntry := table.find(string fid.path);
+					if(direntry.object.data != nil){
+						srv.reply(styxservers->readbytes(m, direntry.object.data));
 						continue mainloop;
 					}
 
-					path := item.sha1;
+					path := direntry.object.sha1;
 					catch := chan of array of byte;
 					
 					spawn catfile->init(REPOPATH, 0, path, catch, debug);
@@ -381,31 +424,39 @@ mainloop:
 				debugmsg("in stat:\n");
 				if(navop.path == big QRoot)
 					;#pwds = ref (-1, QRoot) :: nil;
-				item := table.find(string navop.path);
-				navop.reply <-= (item.dirstat, "");	
+				direntry := table.find(string navop.path);
+				navop.reply <-= (direntry.getdirstat(), "");	
 
 			Walk =>
 				debugmsg(sprint("in walk: %s\n", navop.name));
 				if(navop.name == ".."){
 					if(len pwds > 1)
 						pwds = tl pwds;
-					item := table.find(string (hd pwds).qid);
-					navop.reply <-= (item.dirstat, nil);
+					ppath := table.find(string navop.path).parent;
+					direntry := table.find(string ppath);
+					navop.reply <-= (direntry.getdirstat(), nil);
+					ppwd = cwd;
+					cwd = ppath;
 					continue mainloop;
 				}
 			
-				debugmsg(sprint("cur path is %bd\n", (hd pwds).qid));
+				debugmsg(sprint("cur path is %bd\n", (hd pwds).path));
 				for(l := findchildren(navop.path); l != nil; l = tl l){
 					debugmsg("navigate/walk forloop\n");
-					item := hd l;
-					dirstat := item.dirstat;
+					direntry := hd l;
+					dirstat := direntry.getdirstat();
+					#DELME:
 					if(dirstat == nil)
-						dirstat = ref sys->stat(string2path(item.sha1)).t1;
+					{
+						dirstat = ref sys->stat(string2path(direntry.object.sha1)).t1;
+					}
 
 					if(dirstat.name == navop.name){
 						debugmsg("matching in walking\n");
 						if(dirstat.qid.qtype & Sys->QTDIR){
 							debugmsg("dir is matched\n");
+							ppwd = cwd;
+							cwd = navop.path;
 							#pwds = (fid.fid, navop.path) :: pwds;
 						}
 						navop.reply <-= (dirstat, nil);
@@ -417,17 +468,16 @@ mainloop:
 			Readdir =>
 				debugmsg(sprint("in readdir: %bd\n", navop.path));
 				item := table.find(string navop.path);
-					children := findchildren(navop.path);
+				children := findchildren(navop.path);
 				while(children != nil && navop.offset-- > 0){
 					children = tl children;
 				}
 				count := navop.count;
 				while(children != nil && count-- > 0){					
-					navop.reply <-= ((hd children).dirstat, nil);
 					debugmsg("WTFFFF\n");
+					navop.reply <-= ((hd children).getdirstat(), nil);
 					children = tl children;
 				}
-				debugmsg("aADASD\n");
 				navop.reply <-= (nil, nil);
 		}
 	}
@@ -494,7 +544,8 @@ readchildren(sha1: string, parentqid: big)
 {
 
 	(filetype, filesize, filebuf) :=  utils->readsha1file(sha1);
-	parentitem := table.find(string parentqid);
+	debugmsg(sprint("IN  READCHILDREN sha is %s == filetype == %s\n", sha1, filetype));
+	parent := table.find(string parentqid);
 	if(filetype == "commit"){
 		ibuf := bufio->aopen(filebuf);
 		s := ibuf.gets('\n');
@@ -505,15 +556,15 @@ readchildren(sha1: string, parentqid: big)
 		sha = sha[1:];
 
 		q := QMax++;
-		item := shatable.find(sha);
+		shaobject := shatable.find(sha);
 		dirstat := (sys->stat(string2path(sha))).t1;
-		if(item == nil){
-			item = ref Item(q, nil, makedirstat(q, "tree", dirstat), sha, nil);
-			table.add(string q, item);
-			shatable.add(item.sha1, item);
+		if(shaobject == nil){
+			shaobject = ref Shaobject(makedirstat(q, dirstat), nil, sha, filetype, nil);
+			shatable.add(shaobject.sha1, shaobject);
 		}
-		
-		parentitem.children = item.qid :: parentitem.children;
+		direntry := ref Direntry(q, "tree", shaobject, parent.path);
+		table.add(string direntry.path, direntry);
+		parent.object.children = direntry.path :: parent.object.children;
 
 		parents := "";
 		pnum := 1;
@@ -523,14 +574,20 @@ readchildren(sha1: string, parentqid: big)
 			if(recordtype != "parent")
 				break;
 			sha = sha[1:len sha - 1];
-			item = shatable.find(sha);
-			#FIXME: Code for reusing commits should be added(if that commit has a tag).
+			shaobject = shatable.find(sha);
+
 			q = QMax++;
+			name := "parent" + string pnum++;
 			dirstat = (sys->stat(string2path(sha))).t1;
-			item = ref Item(q, nil, makedirstat(q, "parent" + string pnum++, dirstat), sha, nil);
-			table.add(string q, item) ;
-			shatable.add(item.sha1, item);
-			parentitem.children = item.qid :: parentitem.children;
+			shaobject = shatable.find(sha);
+			if(shaobject == nil){
+				shaobject = ref Shaobject(makedirstat(q, dirstat), nil, sha, "commit", nil);
+				shatable.add(sha, shaobject);
+			}
+			direntry = ref Direntry(q, name, shaobject, parent.path);
+
+			table.add(string direntry.path, direntry) ;
+			parent.object.children = direntry.path :: parent.object.children;
 		}
 
 		msg := s;
@@ -538,73 +595,76 @@ readchildren(sha1: string, parentqid: big)
 			msg += s;
 		}
 
-		createlogstat(parentitem, ref dirstat, msg);
+		createlogstat(parent, ref dirstat, msg);
 	}
 	else if(filetype == "tree"){
 		debugmsg("file tteee\n");
 		ibuf := bufio->aopen(filebuf);
 
 		while((s := ibuf.gets('\0'))!= ""){
-			debugmsg("ASDASDASD\n");
 			q := QMax++;
 			sha := array[SHALEN] of byte;
 			ibuf.read(sha, SHALEN);
 			shastr := sha2string(sha);
-			item := shatable.find(shastr);
-			if(item == nil){
+			shaobject := shatable.find(shastr);
+			s = s[:len s - 1];
+			(mode, name) := stringmod->splitl(s, " ");
+			name = name[1:];
+			if(shaobject == nil){
 				dirstat := sys->stat(string2path(shastr)).t1; 
-				s = s[:len s - 1];
-				(mode, name) := stringmod->splitl(s, " ");
-				name = name[1:];
-				dirstat.name = name; 
-				debugmsg("ININININIF\n");
-				dirstat.qid.path = q;
-				item = ref Item(q, nil, ref dirstat, shastr, nil);
-				table.add(string q, item);
-				shatable.add(item.sha1, item);
-				debugmsg("YYYYY\n");
+				shaobject = ref Shaobject(ref dirstat, nil, shastr, "blob", nil);
+				shatable.add(shastr, shaobject);
 			}
-			parentitem.children = item.qid :: parentitem.children;
+			shaobject.dirstat.mode = 8r644;
+			if(utils->isdir(stringmod->toint(mode, 8).t0)){
+				shaobject.dirstat = makedirstat(q, *shaobject.dirstat);
+			}
+			direntry := ref Direntry(q, name, shaobject, parent.path);
+			table.add(string direntry.path, direntry);
+			parent.object.children = direntry.path :: parent.object.children;
 		}
 	}
 }
 
-createlogstat(parentitem: ref Item, dirstat: ref Sys->Dir, msg: string)
+createlogstat(parent: ref Direntry, dirstat: ref Sys->Dir, msg: string)
 {
 	q := QMax++;
-	item := ref Item(q, nil, makefilestat(q, "commit_msg", *dirstat), "", sys->aprint("%s", msg));
-	table.add(string q, item);
-	parentitem.children = item.qid :: parentitem.children;
+	shaobject := ref Shaobject(dirstat, nil, nil, nil, sys->aprint("%s", msg));
+	direntry := ref Direntry(q, "commit_msg", shaobject, parent.path);
+	table.add(string direntry.path, direntry);
+	parent.object.children = direntry.path :: parent.object.children;
 
 	#Adding log entry
 	q = QMax++;
-	item = ref Item(q, nil, makefilestat(q, "log", *dirstat), parentitem.sha1, nil);
-	table.add(string q, item);
-	parentitem.children = item.qid :: parentitem.children;
+	shaobject.data = nil;
+	shaobject.sha1 = parent.object.sha1;
+	direntry = ref Direntry(q, "log", shaobject, parent.path);
+	table.add(string direntry.path, direntry);
+	parent.object.children = direntry.path :: parent.object.children;
 }
 
-findchildren(parentqid: big): list of ref Item
+findchildren(ppath: big): list of ref Direntry 
 {
-	item := table.find(string parentqid);
-	if(item.children == nil && (parentqid < QIndex || parentqid > QIndex3)){
-		debugmsg(sprint("not filled %bd\n", parentqid));
-		readchildren(item.sha1, parentqid);
-	}
-
-	if(item == nil)	
+	direntry := table.find(string ppath);
+	if(direntry == nil)	
 		return nil;
 
-	children: list of ref Item;
-	l := item.children;
+	if(direntry.object.children == nil && (ppath < QIndex || ppath > QIndex3)){
+		debugmsg(sprint("not filled %bd\n", ppath));
+		readchildren(direntry.object.sha1, ppath);
+	}
+
+	children: list of ref Direntry;
+	l := direntry.object.children;
 	while(l != nil){
-		item1 := table.find(string hd l);
-		if(item1 != nil){
-			children = item1 :: children; 
+		dentry := table.find(string hd l);
+		if(dentry != nil){
+			children = dentry :: children; 
 		}
 
 		l = tl l;
 	}
-	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, (hd pwds).qid));
+	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, ppath));
 	return children; 
 }
 
@@ -619,11 +679,10 @@ makefilestat(q: big, name: string, src: Sys->Dir): ref Sys->Dir
 	return dirstat;
 }
 
-makedirstat(q: big, name: string, src: Sys->Dir): ref Sys->Dir
+makedirstat(q: big, src: Sys->Dir): ref Sys->Dir
 {
 	dirstat := ref src;
 	dirstat.qid.path = q;
-	dirstat.name = name;
 	dirstat.qid.qtype |= Sys->QTDIR;
 	dirstat.mode |= Sys->DMDIR | 8r755;
 
@@ -660,8 +719,17 @@ printlist(l: list of ref Fidqid)
 {
 	print("-----------------------\n");
 	while(l != nil){
-		print("===> %d ==  %bd", (hd l).fid, (hd l).qid);
+		print("===> %d ==  %bd", (hd l).fid, (hd l).path);
 		l = tl l;
 	}
 	print("-----------------------\n");
+}
+
+Direntry.getdirstat(direntry: self ref Direntry): ref Sys->Dir
+{
+	ret := *direntry.object.dirstat;
+	ret.qid.path = direntry.path;
+	ret.name = direntry.name;
+
+	return ref ret;
 }

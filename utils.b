@@ -352,7 +352,7 @@ equalshas(sha1, sha2: array of byte): int
 
 isdir(mode: int): int
 {
-	return mode & 16384;
+	return (mode & 16384) > 0;
 }
 
 bytepos(a: array of byte, offset: int, delim: byte): int
