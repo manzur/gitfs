@@ -17,7 +17,8 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-error, SHALEN, readsha1file, string2path, sha2string, INDEXPATH: import utils;
+error, readsha1file, sha2string, SHALEN: import utils;
+
 
 include "gitindex.m";
 	gitindex: Gitindex;
@@ -29,11 +30,11 @@ splitl: import stringmodule;
 
 index: ref Index;
 
-REPOPATH: string;
+repopath: string;
 
 debug: int;
 
-init(args: list of string, deb: int)
+init(arglist: list of string, deb: int)
 {
 	sys = load Sys Sys->PATH;	
 	utils = load Utils Utils->PATH;
@@ -42,20 +43,17 @@ init(args: list of string, deb: int)
 	tables = load Tables Tables->PATH;
 	stringmodule = load String String->PATH;
 
-	REPOPATH = hd args;
+	repopath = hd arglist;
 	debug = deb;
-	utils->init(REPOPATH, debug);
-	if(len args != 2)
-		usage();
+	utils->init(arglist, debug);
 
-	readtree(hd (tl args));
 }
 
 readtree(path: string)
 {
-	index = Index.new(REPOPATH, debug);
+#	index = Index.new(REPOPATH, "",debug);
 	readtreefile(path, "");
-	index.writeindex(INDEXPATH);
+#	index.writeindex(INDEXPATH);
 }
 
 readtreefile(path: string, basename: string)
@@ -65,6 +63,7 @@ readtreefile(path: string, basename: string)
 	ibuf := bufio->aopen(buf);
 	while((s := ibuf.gets('\0')) != ""){
 		(modestr, filepath) := splitl(s, " ");
+		sys->print("==>filepath %s\n", filepath);
 		mode := stringmodule->toint(modestr,10).t0;
 		if(isdir(mode)){
 			sha1 := array[SHALEN] of byte;
@@ -73,15 +72,11 @@ readtreefile(path: string, basename: string)
 			continue;
 		}
 		entry := Entry.new();
-		entry.mode = mode;
-		entry.namelen = len basename + len filepath;
 		entry.name = basename + filepath;
 		ibuf.read(entry.sha1, SHALEN);
 
-#FIXME: find better solution to find length of the file
-		(filetype, filesize, buf) = readsha1file(sha2string(entry.sha1));
-		entry.length = big len buf;
-		index.addentry(entry);
+		sys->print("=>entry=>%o %s==>%s\n",mode, entry.name, sha2string(entry.sha1));
+#		index.addentry(entry);
 	}
 }
 

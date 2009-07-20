@@ -32,7 +32,7 @@ Index: import gitindex;
 
 index: ref Index;
 
-REPOPATH: string;
+MNTPT, REPOPATH: string;
 
 init(args: list of string, debug: int)
 {
@@ -41,12 +41,18 @@ init(args: list of string, debug: int)
 	tables = load Tables Tables->PATH;
 	readdir = load Readdir Readdir->PATH;
 	utils = load Utils Utils->PATH;
+	sys->print("HEYHEHEHEE\n");
 	
 	REPOPATH = hd args; 
+	args = tl args;
+	MNTPT = hd args;
 	utils->init(REPOPATH, debug);
+	sys->print("HEYHEHEHEE\n");
 	sys->create(REPOPATH + "index.lock", Sys->OWRITE | Sys->OEXCL, Sys->DMEXCL | 8r644);
-	index = Index.new(REPOPATH, debug);
+	index = Index.new(REPOPATH, MNTPT, debug);
+	sys->print("READDA\n");
 	cnt := index.readindex(INDEXPATH);
+	sys->print("after index read\n");
 	if(cnt < 0)
 		return;
 
@@ -70,16 +76,17 @@ init(args: list of string, debug: int)
 
 	printindex(index);
 	debugmsg(sprint("Writing to index\n"));
+	sys->print("HEYHEHEHEE\n");
 	index.writeindex("index.lock");
 
 	#renaming index.lock to index
 	dirstat := sys->nulldir;
 	dirstat.name = INDEXPATH;
-	if(sys->wstat(REPOPATH + "index.lock", dirstat) < 0)
-	{
-		error("file index.lock can't be renamed to index\n");
-		return;
-	}
+#	if(sys->wstat(REPOPATH + "index.lock", dirstat) < 0)
+#	{
+#		error("file index.lock can't be renamed to index\n");
+#		return;
+#	}
 }
 
 printindex(index: ref Index)
@@ -94,12 +101,12 @@ printindex(index: ref Index)
 
 addfile(path: string)
 {
-	(ret, dirstat) := sys->stat(REPOPATH + path);
+	(ret, dirstat) := sys->stat(MNTPT + path);
 	if(ret == -1)
 		error(sprint("%s does not exist\n", path));
 	if(dirstat.mode & Sys->DMDIR)
 	{
-		(dirs,cnt)  := readdir->init(REPOPATH + path,Readdir->NAME);
+		(dirs,cnt)  := readdir->init(MNTPT + path,Readdir->NAME);
 		if(path[len path - 1] != '/')
 			path += "/";
 

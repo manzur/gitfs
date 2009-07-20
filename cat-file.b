@@ -3,14 +3,12 @@ implement Catfile;
 include "sys.m";
 	sys: Sys;
 
-include "tables.m";
-	tables: Tables;
-Strhash: import tables;	
-
 include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;		
-	
+Iobuf: import Bufio;		
+
+include "tables.m";
+Strhash: import Tables;	
+
 include "utils.m";
 	utils: Utils;
 bytepos, sha2string, SHALEN: import utils;	
@@ -19,17 +17,21 @@ include "cat-file.m";
 
 msgchan: chan of array of byte;
 printtypeonly := 0;
-REPOPATH: string;
+repopath: string;
 
-init(repopath: string, typeonly: int, path: string, ch: chan of array of byte, debug: int)
+init(arglist: list of string, ch: chan of array of byte, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
 
-	REPOPATH = repopath;
-	utils->init(repopath, debug);
-       
-	printtypeonly = typeonly;
+	utils->init(arglist,  debug);
+
+	repopath = hd arglist;
+	arglist = tl tl arglist;
+	path := hd arglist; 
+
+#FIXME: use it or remove
+#	printtypeonly = typeonly;
 	msgchan = ch;
 	catfile(path);
 }
@@ -38,7 +40,6 @@ catfile(path: string)
 {
 	(filetype, nil, buf) := utils->readsha1file(path);	
 
-	msgchan <-= sys->aprint("filetype: %s\n", filetype);
 	if(printtypeonly){
 		msgchan <-= nil;
 		return;

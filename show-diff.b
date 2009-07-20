@@ -42,7 +42,8 @@ init(args: list of string, debug: int)
 
 	REPOPATH = hd args;
 	utils->init(REPOPATH, debug);
-	index = Index.new(REPOPATH, debug);
+#FIXME: Replace "" with MNTPT
+	index = Index.new(REPOPATH, "",debug);
 	index.readindex(utils->INDEXPATH);
 	showdiffs();
 }

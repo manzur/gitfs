@@ -9,7 +9,6 @@ sprint: import sys;
 
 include "draw.m";
 
-
 include "keyring.m";
 	keyring: Keyring;
 		
@@ -21,45 +20,61 @@ include "bufio.m";
 	bufio: Bufio;
 Iobuf: import bufio;
 
+include "readdir.m";
+	readdir: Readdir;
+
 include "string.m";
-	strmodule: String;
+	stringmod: String;
 
 include "tables.m";
 	tables: Tables;	
 Strhash: import tables;
 
+include "workdir.m";
+	gwd: Workdir;
 
-REPOPATH: string;
+include "path.m";
+	pathmod: Pathmod;
+cleandir, dirname, makeabsentdirs, makepathabsolute, string2path: import pathmod;	
+
+
+repopath: string;
 
 hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
 			"a","b","c", "d", "e", "f"};
 
 stderr: ref Sys->FD;
 
-init(repopath: string, deb: int)
+init(arglist: list of string, deb: int)
 {
 	sys = load Sys Sys->PATH;
 	keyring = load Keyring Keyring->PATH;
 	inflate = load Filter Filter->INFLATEPATH;
 	deflate = load Filter Filter->DEFLATEPATH;
 	bufio   = load Bufio Bufio->PATH;
-	strmodule = load String String->PATH;
+	gwd     = load Workdir Workdir->PATH;
+	readdir = load Readdir Readdir->PATH;
+	stringmod = load String String->PATH;
 	tables = load Tables Tables->PATH;
+
+	repopath = hd arglist;
+
+	pathmod = load Pathmod Pathmod->PATH;
+	pathmod->init(repopath);
 	inflate->init();
 	deflate->init();
 	stderr = sys->fildes(2);
-	REPOPATH = repopath;
 	debug = deb;
 }
 
 writesha1file(ch: chan of (int, array of byte))
 {
 
+#FIXME: make deflate level more configurable
 	rqchan := deflate->start("z9");
 	old := array[0] of byte;
-
 	buf: array of byte;
-	sz := 0;
+	remainder := sz := 0;
 mainloop:
 	while(1)
 	{
@@ -77,9 +92,21 @@ mainloop:
 				rq.reply <-= 0;
 
 			Fill => 
-				(sz, buf) = <-ch;	
+				if(!remainder)
+					(sz, buf) = <-ch;	
+				else{
+					buf = buf[remainder:];
+					sz = len buf;
+				}
+				if(len rq.buf < sz){
+					remainder = len rq.buf; 
+					rq.buf[:] = buf[:remainder];
+					rq.reply <-= remainder;
+					continue mainloop;
+				}
 				rq.buf[:] = buf[:];
 				rq.reply <-= sz;
+				remainder = 0;
 			Error =>
 				error(sprint("error ocurred: %s\n", rq.e));
 				return;
@@ -156,11 +183,6 @@ strchr(s: string, ch: int): int
 	return -1;
 }
 
-string2path(filename: string): string
-{
-	return REPOPATH + OBJECTSTOREPATH + "/" + filename[:2] + "/" + filename[2:];
-}
-
 sha2string(sha: array of byte): string
 {
 	ret : string = "";
@@ -175,14 +197,14 @@ sha2string(sha: array of byte): string
 bufsha1(buf: array of byte): array of byte
 {
 	sha := array[SHALEN] of byte;
-	keyring->sha1(buf, len buf, sha, nil);
+#FIXME: ERRR
+	state := keyring->sha1(buf, len buf, nil, nil);
+	keyring->sha1(nil, 0, sha, state);
+
 	return sha;
 }
 
-exists(shaname: string): int
-{
-	return sys->open(string2path(shaname), Sys->OREAD) != nil;
-}
+
 
 
 filesha1(filename: string): array of byte
@@ -204,11 +226,22 @@ filesha1(filename: string): array of byte
 	return sha;
 }
 
+ltrim(s: string): string
+{
+	while(s != nil && s[0] == ' ')
+		s = s[1:];
+		
+	return s;
+}
+
 save2file(path: string, buf: array of byte): int
 {
+	makeabsentdirs(dirname(path));
 	fd := sys->create(path, Sys->OWRITE, 8r644);
 	if(fd == nil || sys->write(fd, buf, len buf) != len buf)
+	{
 		return 1;
+	}
 	return 0;
 }
 
@@ -243,10 +276,11 @@ big2bytes(n: big): array of byte
 {
 	ret := array[BIGSZ] of byte;
 
-	part1 := int (n >> INTSZ * 8);
+	part1 := int (n >> 32);
 	part2 := int n;
-	copyarray(ret, 0, int2bytes(part2), 0, INTSZ);
-	copyarray(ret, INTSZ, int2bytes(part1), 0, INTSZ);
+
+	ret[:] = int2bytes(part2);
+	ret[INTSZ:] = int2bytes(part1);
 	
 	return ret;
 }
@@ -302,14 +336,14 @@ extractfile(shafilename: string): string
 
 getuserinfo(): ref Strhash[ref Config]
 {
-	iobuf := bufio->open(REPOPATH + "config", Bufio->OREAD);
+	iobuf := bufio->open(repopath + "config", Bufio->OREAD);
 	config := Strhash[ref Config].new(10, nil);
 	while((s := iobuf.gets('\n')) != "")		
 	{
 		if(iswhitespace(s))
 			return nil;
 		s = chomp(s);
-		(s1, s2) := strmodule->splitl(s, "=");
+		(s1, s2) := stringmod->splitl(s, "=");
 		s2 = s2[1:];
 		config.add(s1, ref Config(s1, s2));
 	}
@@ -350,7 +384,7 @@ equalshas(sha1, sha2: array of byte): int
 	return 1;
 }
 
-isdir(mode: int): int
+isunixdir(mode: int): int
 {
 	return (mode & 16384) > 0;
 }
@@ -369,7 +403,7 @@ string2sha(sha1: string): array of byte
 	ret := array[SHALEN] of byte;
 
 	for(i := 0; i < len ret; i++)
-		ret[i] = hex2byte(sha1[i * 2]) << 4 | hex2byte(sha1[i * 2 + 1]);
+		ret[i] = (hex2byte(sha1[i*2]) << 4) | hex2byte(sha1[i*2+1]);
 
 	return ret;
 }
@@ -377,12 +411,12 @@ string2sha(sha1: string): array of byte
 hex2byte(val: int): byte
 {
 	if(val >= '0' && val <= '9')
-		return byte val;
+		return byte (val - '0');
 	
 	if(val >= 'A' && val <= 'F')	
-		return byte (val - 10);
+		return byte (val - 'A' + 10);
 
-	return byte (val - 10);
+	return byte (val - 'a' + 10);
 }
 
 debugmsg(msg: string)
@@ -394,5 +428,117 @@ debugmsg(msg: string)
 error(msg: string)
 {
 	sys->fprint(stderr, "%s", msg);
+}
+
+splitl(s: string, sep: string, count: int): (string, string)
+{
+	if(count == 1)
+		return stringmod->splitl(s, sep);
+
+	(s1, s2) := splitl(s, sep, count - 1);	
+	
+	if(len s2 <= 1 ) return (s1, s2);
+
+	s2 = s2[1:];
+	(s3, s4) := stringmod->splitl(s2, sep);
+	s1 += sep + s3;
+
+	return (s1, s4);
+}
+
+comparebytes(a, b: array of byte): int
+{
+	len1 := len a;
+
+	if(len1 < len b)
+		return -1;
+	
+	if(len1 > len b)
+		return 1;
+	
+	for(i := 0; i < len1; i++){
+		if(a[i] < b[i])
+			return -1;
+		else if(a[i] > b[i])
+			return 1;
+	}
+
+	return 0;
+}
+
+cutprefix(prefix, s: string): string
+{
+	if(len prefix > len s)
+		return nil;
+	
+	if(prefix == s[:len prefix]){
+		return s[len prefix:];
+	}
+
+	return nil;
+}
+
+readint(fd: ref Sys->FD): int
+{
+	buf := array[4] of byte;
+	cnt := sys->read(fd, buf, len buf);
+
+	if(cnt != 4)
+		return 0;
+
+	ret := 0;
+	for(i := 0; i < len buf; i++){
+		ret = ret * 10 + int buf[i];
+	}
+
+	return ret;
+}
+
+
+packqid(qid: ref Sys->Qid): array of byte
+{
+	packedqid := array[QIDSZ] of byte;
+
+	packedqid[:] = big2bytes(qid.path);
+	offset := BIGSZ;
+
+	packedqid[offset:] = int2bytes(qid.vers);
+	offset += INTSZ;
+
+	packedqid[offset:] = int2bytes(qid.qtype);
+	offset += INTSZ;
+
+	sys->write(sys->fildes(1), packedqid, QIDSZ);
+	return packedqid;
+}
+
+readshort(fd: ref Sys->FD): int
+{
+	buf := array[2] of byte;
+
+	cnt := sys->read(fd, buf, len buf);
+	
+	if(cnt != 2)
+		return 0;
+
+	ret := 0;
+	for(i := 0; i < len buf; i++)
+		ret = (ret << 8) | int buf[i];
+	
+	return ret;
+}
+
+
+unpackqid(buf: array of byte, offset: int): Sys->Qid
+{
+	path := bytes2big(buf, offset);
+	offset += BIGSZ;
+
+	vers := bytes2int(buf, offset);
+	offset += INTSZ;
+
+	qtype := bytes2int(buf, offset);
+	
+	return Sys->Qid(path, vers, qtype);
 }
 

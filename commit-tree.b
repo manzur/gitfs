@@ -1,13 +1,8 @@
 implement Committree;
 
-include "commit-tree.m";
-
 include "sys.m";
 	sys: Sys;
 sprint: import sys;
-
-include "arg.m";
-	arg: Arg;
 
 include "filter.m";
 	deflate: Filter;
@@ -16,15 +11,12 @@ include "bufio.m";
 	bufio: Bufio;
 Iobuf: import bufio;
 
-include "tables.m";
-	tables: Tables;
-
-Strhash: import tables;
+include "path.m";
+	pathmod: Pathmod;
 
 include "utils.m";
 	utils: Utils;
-Config: import utils;
-error, debugmsg, chomp, readline, int2string, sha2string: import utils;
+error, int2string, readline, sha2string: import utils;
 
 
 include "daytime.m";
@@ -33,56 +25,47 @@ include "daytime.m";
 include "env.m";
 	env: Env;
 
+include "commit-tree.m";
+
+MAXUSERLEN: con 128;
+
 stderr: ref Sys->FD;
-REPOPATH: string;
+repopath: string;
 
 
-init(args: list of string, debug: int)
+init(arglist: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
-	arg = load Arg Arg->PATH;
-	utils = load Utils Utils->PATH;
-	deflate = load Filter Filter->DEFLATEPATH;
+
 	bufio = load Bufio Bufio->PATH;
-	tables = load Tables Tables->PATH;
 	daytime = load Daytime Daytime->PATH;
+	deflate = load Filter Filter->DEFLATEPATH;
 	env = load Env Env->PATH;
+
+	pathmod = load Pathmod Pathmod->PATH;
+	utils = load Utils Utils->PATH;
 
 	stderr = sys->fildes(2);
 
-	if(len args < 2)
-		usage();
-
-	REPOPATH = hd args;
-	args = tl args;
-	
-	utils->init(REPOPATH, debug);
 	deflate->init();
+
+	repopath = hd arglist;
+	utils->init(arglist, debug);
+	pathmod->init(repopath);
 
 	parents: list of string = nil;
 
-	sha := hd args;
-		arg->init(args);
-
-	while((c := arg->opt()) != 0){
-		case c{
-
-			'p' => parents = arg->arg() :: parents;
-			 *  => usage(); return; 
-		}
-	}
-
-	commit(sha, parents, arg->argv());
 }
 
-commit(treesha: string, parents: list of string, args: list of string): string
+#returns sha1 of the new commit
+commit(treesha: string, parents: list of string, comments: string): string
 {
-	if(!utils->exists(treesha)){
+	if(!pathmod->shaexists(treesha)){
 		error(sprint("no such tree(%s) file: %r\n", treesha));
 		return "";
 	}
 	for(l := parents; l != nil; l = tl l){
-		if(!utils->exists(hd l)){
+		if(!pathmod->shaexists(hd l)){
 			error(sprint("no such sha file: %s\n", hd l));
 			return "";
 		}
@@ -94,24 +77,8 @@ commit(treesha: string, parents: list of string, args: list of string): string
 		commitmsg += "parent " + (hd parents) + "\n";
 		parents = tl parents;
 	}
-	config: ref Strhash[ref Config];
-	config = utils->getuserinfo();
 
-	authorname := hd args;
-	args = tl args;
-
-	authoremail := hd args;
-	args = tl args;
 	
-	authordate := hd args;
-	args = tl args;
-
-	comname := hd args;
-	args = tl args;
-	
-	comemail := hd args;
-	args = tl args;
-
 #	authorname := env->getenv("AUTHOR_NAME");
 #	authoremail := env->getenv("AUTHOR_EMAIL");
 #	authordate := env->getenv("AUTHOR_DATE");
@@ -124,21 +91,16 @@ commit(treesha: string, parents: list of string, args: list of string): string
 #	if(comname == "" || comemail == ""){
 #		(comname, comemail) = getpersoninfo("committer");
 #	}
-	date := daytime->time();
 
-	if(authordate == "")
-		authordate = date;
+	author := getauthorinfo();
+	committer := getcommitterinfo();
 
-	commitmsg += "author " + authorname + " <" + authoremail + "> " + authordate + "\n";
-	commitmsg += "committer " + comname + " <" + comemail + "> " + date + "\n\n";
+#	commitmsg += "author " + authorname + " <" + authoremail + "> " + authordate + "\n";
+#	commitmsg += "committer " + comname + " <" + comemail + "> " + date + "\n\n";
+	commitmsg += author + committer;
 
-	while(args != nil){
-		commitmsg += hd args;
-		args = tl args;
-	}
-#	commitmsg += getcomment();
-
-
+	#Should add code for adding encoding field, if in the encoding of Inferno OS changes
+	commitmsg += comments;
 	commitlen := int2string(len commitmsg);
 	#6 - "commit", 1 - " ", 1 - '\0'
 	buf := array[6 + 1 + len commitlen + 1 + len commitmsg] of byte;
@@ -147,7 +109,6 @@ commit(treesha: string, parents: list of string, args: list of string): string
 	buf[7 + len commitlen] = byte 0;
 	buf[7 + len commitlen + 1:] = array of byte commitmsg;
 
-	debugmsg(sprint("Commitmsg: %s", commitmsg));
 
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
@@ -157,13 +118,43 @@ commit(treesha: string, parents: list of string, args: list of string): string
 	ch <-= (0, buf);
 	(sz, sha) = <-ch;
 
-	fd := sys->create(REPOPATH + "head", Sys->OWRITE, 8r644);
+	fd := sys->create(repopath + "head", Sys->OWRITE, 8r644);
 	
 	ret := sha2string(sha);
 
 	sys->fprint(fd, "%s", ret);
 
 	return ret;
+}
+
+
+getcommitterinfo(): string
+{
+	ibuf := bufio->open("/dev/user", Bufio->OREAD);
+	user := ibuf.gets('\0');
+	ibuf = bufio->open("/dev/sysname", Bufio->OREAD);
+	hostname := ibuf.gets('\0');
+	mail := user + "@" + hostname;
+
+	date := daytime->time(); 
+	info := "committer " + user + " <" + mail+ "> " + date + "\n";
+
+	return info;
+}
+
+getauthorinfo(): string
+{
+#FIXME: Code should be changed to get real author's info
+	ibuf := bufio->open("/dev/user", Bufio->OREAD);
+	user := ibuf.gets('\0');
+	ibuf = bufio->open("/dev/sysname", Bufio->OREAD);
+	hostname := ibuf.gets('\0');
+	mail := user + "@" + hostname;
+
+	date := daytime->time(); 
+	info := "author " + user + " <" + mail+ "> " + date + "\n";
+
+	return info;
 }
 
 

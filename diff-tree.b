@@ -18,7 +18,7 @@ Iobuf: import bufio;
 
 include "utils.m";
 	utils: Utils;
-debugmsg, error, SHALEN, equalshas, sha2string, exists,readsha1file, isdir: import utils;
+debugmsg, error, SHALEN, equalshas, sha2string, readsha1file, isdir: import utils;
 
 include "string.m";
 	stringmodule: String;

@@ -6,65 +6,53 @@ include "sys.m";
 	sys: Sys;
 sprint: import sys;
 
-include "tables.m";
-	tables: Tables;
-Strhash: import tables;
-
 include "bufio.m";
 	bufio: Bufio;
 Iobuf: import bufio;
-
-include "utils.m";
-	utils: Utils;
-debugmsg, error, int2string, bufsha1, save2file, string2path, sha2string, SHALEN, INDEXPATH: import utils;
-
-include "gitindex.m";
-	gitindex: Gitindex;
-Index, Entry: import gitindex;
-
 
 include "filter.m";
 	deflate: Filter;
 
 include "string.m";
-	stringmodule: String;
+	stringmod: String;
+
+include "tables.m";
+	tables: Tables;
+Strhash: import tables;
+
+include "gitindex.m";
+	gitindex: Gitindex;
+Index, Entry: import gitindex;
+
+include "utils.m";
+	utils: Utils;
+sha2string, SHALEN: import utils;
 
 index: ref Index;
-REPOPATH: string;
-
-outfd: ref Sys->FD;
+repopath: string;
 debug: int;
 
-init(args: list of string, deb: int)
+init(arglist: list of string, deb: int)
 {
 	sys = load Sys Sys->PATH;
-	deflate = load Filter Filter->DEFLATEPATH;
-	tables = load Tables Tables->PATH;
-	utils = load Utils Utils->PATH;
-	stringmodule = load String String->PATH;
 
-	REPOPATH = hd args;
-	debug = deb;
-	utils->init(REPOPATH, debug);
-	deflate->init();
+	deflate = load Filter Filter->DEFLATEPATH;
+	stringmod = load String String->PATH;
+	tables = load Tables Tables->PATH;
+
 	gitindex = load Gitindex Gitindex->PATH;
-	outfd = sys->create("output", Sys->OWRITE, 8r644);
-	debugmsg(sprint("new tree: %s\n", writetree()));
+	utils = load Utils Utils->PATH;
+
+	debug = deb;
+	repopath = hd arglist;
+
+	deflate->init();
+	utils->init(arglist, debug);
 }
 
-writetree(): string
+writetree(index: ref Index): string
 {
-	index = Index.new(REPOPATH, debug);
-	index.readindex(INDEXPATH);
-
 	l := mergesort(index.entries.all());
-	debugmsg("files:\n");
-	l1 := l;
-	while(l1 != nil)
-	{
-		debugmsg(sprint("file: %s\n", (hd l1).name));
-		l1 = tl l1;
-	}
 	return sha2string(writetreefile(l, "").t0);
 }
 
@@ -75,25 +63,25 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	while(entrylist != nil)
 	{
 		entry := hd entrylist;
-		if(len basename >= len entry.name || !stringmodule->prefix(basename, entry.name))
+		if(len basename >= len entry.name || !stringmod->prefix(basename, entry.name))
 			break;
 
-		mode := entry.mode;
 		sha1 := entry.sha1;
 		name := entry.name;
+
+		#32768 - flag for indicating regular file in Linux
+		mode := 8r644 | 32768;
+
 		rest: string;
-		debugmsg(sprint("name is: %s; mode is %d; sha1 is %s\n", name,mode,sha2string(sha1)));
-		(name, rest) = stringmodule->splitl(name[len basename:], "/");
-		mode |= 32768;
+		(name, rest) = stringmod->splitl(name[len basename:], "/");
 		if(rest != "")
 		{
 			(sha1, entrylist) = writetreefile(entrylist, basename + name + "/");
-			mode &= 1023;
-			mode = mode | 16384;
-
+			#turning on flag for the dir mode
+			mode = 8r755 | 16384;
 		}
-		record := array of byte sprint("%o %s", mode, name);
-		sys->write(sys->fildes(1), record, len record);
+
+		record := sys->aprint("%o %s", mode, name);
 		temp := array[len record + 1 + SHALEN] of byte;
 		temp[:] = record;
 		temp[len record] = byte 0;
@@ -106,42 +94,28 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 		}
 		filelist[offset:] = temp;
 		offset += len temp;
-		debugmsg(sprint("mode is %o\n", mode));
 		if(entrylist != nil)
 			entrylist = tl entrylist;
 	}
 
-	debugmsg(sprint("size is: %d\n", offset));
-	header := sys->sprint("tree %d", offset);
-	headerlen := len array of byte header;
+	header := sys->aprint("tree %bd", big offset);
 
 	#+1 is for 0 byte,which is used as a separator
-	buf := array[headerlen + offset + 1] of byte;
-	buf[:] = array of byte header;
-	buf[headerlen] = byte 0;
-	buf[headerlen + 1:] = filelist[:offset];
+	buf := array[len header + offset + 1] of byte;
+	buf[:] = header[:];
+	buf[len header] = byte 0;
+	buf[len header + 1:] = filelist[:offset];
 
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
 	sha: array of byte;
 	sz: int;
 	ch <-= (len buf, buf);
-	ch <-= (0, buf);
+	ch <-= (0, nil);
 	(sz, sha) = <-ch;
-	
-	return (sha, entrylist);
-}
 
-#used for compatibility with unix mode
-fillmode(mode: int): int
-{
-	if(mode & Sys->DMDIR)
-	{
-		mode &= 1023;
-		mode |= 16384;
-		return mode;
-	}
-	return mode & 1023;
+
+	return (sha, entrylist);
 }
 
 mergesort(l: list of ref Entry): list of ref Entry

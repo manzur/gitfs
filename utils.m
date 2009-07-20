@@ -2,14 +2,12 @@
 Utils: module
 {
 	PATH: con "/dis/git/utils.dis";
+
 	QIDSZ:    con 16;
 	BIGSZ:    con 8;
 	INTSZ:    con 4;
 	SHALEN:   con 20;
-	INDEXPATH: con ".git/index";
-	HEADSPATH: con ".git/refs/heads";
-	OBJECTSTOREPATH: con ".git/objects";
-	CONFIGFILEPATH: con "config";
+	MAXINT: con (1 << 31) - 1;
 
 	debug: int;
 
@@ -18,7 +16,7 @@ Utils: module
 		attr, val: string;
 	};
 
-	init:          fn(repopath: string, debug: int);
+	init:          fn(arglist: list of string, debug: int);
 	
 	writesha1file: fn(ch: chan of (int, array of byte));
 	readsha1file:  fn(path: string): (string, int, array of byte);
@@ -29,29 +27,35 @@ Utils: module
 	int2string:    fn(num: int): string;
 
 	save2file:     fn(path: string, buf: array of byte): int;
-	string2path:   fn(filename: string): string;
 	sha2string:    fn(sha: array of byte): string;
 	string2sha:    fn(sha1: string): array of byte;
-	exists:	       fn(shaname: string): int;
 
+	comparebytes:  fn(a, b: array of byte): int;
 	bytes2int:     fn(buf: array of byte, offset: int): int;
 	bytes2big:     fn(buf: array of byte, offset: int): big;
 	big2bytes:     fn(n: big): array of byte;
 	int2bytes:     fn(number: int): array of byte;
 	allocnr:       fn(num: int): int;
+	readint:       fn(fd: ref Sys->FD): int;
+	readshort:     fn(fd: ref Sys->FD): int;
+
+	packqid:       fn(qid: ref Sys->Qid): array of byte;
+	unpackqid:     fn(buf: array of byte, offset: int): Sys->Qid;
 
 	copyarray:     fn(dst: array of byte, doffset: int, src: array of byte, soffset, count : int);
+	cutprefix:     fn(prefix, s: string): string;
 
 	equalqids:     fn(q1,q2: Sys->Qid): int;
 	extractfile:   fn(shafilename: string): string;
 	equalshas:     fn(sha1, sha2: array of byte): int;
-	getuserinfo:   fn():ref Strhash[ref Config];
 
+	ltrim:         fn(s: string): string;
 	chomp:         fn(s: string): string;
+	splitl:        fn(s: string, sep: string, count: int): (string, string);
 
 	readline:      fn(ibuf: ref Iobuf): string;
 
-	isdir:         fn(mode: int): int;
+	isunixdir:         fn(mode: int): int;
 	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 
 
 	error:	       fn(msg: string);

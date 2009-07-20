@@ -20,7 +20,7 @@ Index, Entry: import gitindex;
 
 include "utils.m";
 	utils: Utils;
-debugmsg, error, INDEXPATH, sha2string,string2path, readsha1file: import utils;	
+debugmsg, dirname, makedirs, error, INDEXPATH, sha2string,string2path, readsha1file: import utils;	
 
 include "arg.m";
 	arg: Arg;
@@ -41,7 +41,8 @@ init(args: list of string, debug: int)
 	REPOPATH = hd args;
 
 	utils->init(REPOPATH, debug);
-	index = Index.new(REPOPATH, debug);
+#FIXME: Replace "" with MNTPT
+	index = Index.new(REPOPATH,"", debug);
 	if(!index.readindex(INDEXPATH))
 	{
 		error("index read error\n");
@@ -120,29 +121,6 @@ checkoutall()
 		debugmsg(sprint("checking out: %s\n", (hd l).name));
 		checkoutfile((hd l).name);
 	}
-}
-
-dirname(path: string): string
-{
-	for(i := len path - 1; i >= 0; i--){
-		if(path[i] == '/')
-			return path[0:i];
-	}
-	return ".";
-}
-
-makedirs(path: string)
-{
-	if(!exists(path))
-		makedirs(dirname(path));
-	sys->create(path, Sys->OREAD,  Sys->DMDIR|8r755);
-
-}
-
-exists(path: string): int
-{
-	(ret, nil) := sys->stat(path);
-	return ret != -1;
 }
 
 

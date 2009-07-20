@@ -13,9 +13,12 @@ include "bufio.m";
 	bufio: Bufio;
 Iobuf: import bufio;
 
+include "path.m";
+OBJECTSTOREPATH: import Pathmod;  
+ 
 include "utils.m";
 	utils: Utils;
-error, debugmsg, SHALEN, readsha1file, isdir, sha2string, OBJECTSTOREPATH: import utils;
+error, debugmsg, SHALEN, readsha1file, isunixdir, sha2string: import utils;
 
 include "readdir.m";
 	readdir: Readdir;
@@ -37,11 +40,9 @@ HASHSZ: con 256;
 
 objects := array[HASHSZ] of list of ref Object;
 
-checkvalidness: int;
-stderr: ref Sys->FD;
-REPOPATH: string;
+repopath: string;
 
-init(args: list of string, debug: int)
+init(arglist: list of string, debug: int)
 {
 	sys = load Sys Sys->PATH;
 	utils = load Utils Utils->PATH;
@@ -49,14 +50,14 @@ init(args: list of string, debug: int)
 	readdir = load Readdir Readdir->PATH;
 	stringmodule = load String String->PATH;
 
-	REPOPATH = hd args;
-	utils->init(REPOPATH, debug);
+	utils->init(arglist, debug);
+	repopath = hd arglist;
 	check();
 }
 
 check()
 {
-	readrepo(REPOPATH + OBJECTSTOREPATH);
+	readrepo(repopath + OBJECTSTOREPATH);
 
 	cnt := 0;
 	for(i := 0; i < HASHSZ; i++){
@@ -77,7 +78,7 @@ check()
 readrepo(path: string)
 {
 	(ret, nil) := sys->stat(path);
-	#!isdir(mode)
+	#!isunixdir(mode)
 	if(ret == -1 )
 	{
 		error(sprint("Object store(%s) is not found\n", OBJECTSTOREPATH));

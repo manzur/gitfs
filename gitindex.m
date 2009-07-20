@@ -4,10 +4,14 @@ Gitindex : module
 {
 	PATH: con "/dis/git/gitindex.dis";
 	CACHESIGNATURE: con 16r44495243;
+	STAGEMASK: con 16r3000;
+	EXTENDEDENTRY: con 16r4000; 
+	STAGESHIFT: con 12;
 
-	HEADERSZ: con 32;
+
+	HEADERSZ: con 12;
 #This is a entry size up to name field
-	ENTRYSZ:  con 64; 
+	ENTRYSZ:  con 40; 
 
 #This constant is used for determining whether hash 
 #table needs resizing. If entriesnt * CLSBND >= hashcap,
@@ -19,26 +23,22 @@ Gitindex : module
 		signature:  int;
 		version:    int;
 		entriescnt: int;
-		sha1:       array of byte;
-		pack:       fn(buf: array of byte): ref Header;
-		unpack:     fn(header: self ref Header): array of byte;
-		new:	    fn(): ref Header;
+
+		pack:     fn(header: self ref Header): array of byte;
+		unpack:   fn(buf: array of byte): ref Header;
+		new:	  fn(): ref Header;
 	};
 
 	
 	Entry: adt
 	{
 		qid:     Sys->Qid;
-		dtype:   int;
-		dev:     int;
-		mtime:   int;
-		mode:    int;
-		length:  big;
 		sha1:    array of byte;
-		namelen: int;
+		flags:	 int;
 		name:    string;
-		pack:    fn(buf: array of byte): ref Entry;
-		unpack:  fn(entry: self ref Entry): array of byte;
+
+		pack:  fn(entry: self ref Entry): array of byte;
+		unpack:    fn(buf: array of byte): ref Entry;
 		compare: fn(e1: self ref Entry, e2: ref Entry): int;
 		new:     fn(): ref Entry;
 	};
@@ -48,13 +48,14 @@ Gitindex : module
 		header:     ref Header;
 		entries:    ref Strhash[ref Entry]; 	
 		hashcap:    int;
-		addfile:    fn(index: self ref Index, path: string): int;
+		addfile:    fn(index: self ref Index, path: string): string;
 		addentry:   fn(index: self ref Index, entry: ref Entry);
+		getentries: fn(index: self ref Index, stage: int): list of ref Entry;
+		removeentries: fn(index: self ref Index): ref Index;
 		rmfile:     fn(index: self ref Index, path: string);
-		readindex:  fn(index: self ref Index, path: string): int;
-		writeindex: fn(index: self ref Index, path: string): int;
-		new:        fn(repopath: string, debug: int): ref Index;
+		new:        fn(arglist: list of string, debug: int): ref Index;
 	};
 	
-		
+	readindex:  fn(index:ref Index): int;
+	writeindex: fn(index:ref Index): int;
 };

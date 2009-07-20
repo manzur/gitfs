@@ -16,51 +16,76 @@ Iobuf: import bufio;
 include "gitindex.m";
 	gitindex : Gitindex;
 
+include "path.m";
+	pathmod: Pathmod;
+dirname, makeabsentdirs: import pathmod;	
+
 include "utils.m";
 	utils: Utils;
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-debugmsg, error, bytes2int, bytes2big, big2bytes, int2bytes, filesha1, allocnr,sha2string, copyarray, equalshas: import utils;
+debugmsg, error, bytes2int, bytes2big, big2bytes, comparebytes,int2bytes, filesha1, allocnr, packqid, sha2string, unpackqid, equalshas: import utils;
 
 include "exclude.m";
 	exclude: Exclude;
 
+include "string.m";
+	stringmod: String;
 
 include "keyring.m";
 	keyring: Keyring;
 
 filebuf: array of byte;
 
-REPOPATH: string;
+indexpath, mntpt, repopath: string;
 
-Index.new(repopath: string, debug: int): ref Index
+Index.new(arglist: list of string, debug: int): ref Index
 {
 	sys = load Sys Sys->PATH;
 	tables = load Tables Tables->PATH;
-	utils = load Utils Utils->PATH;
 	keyring = load Keyring Keyring->PATH;
+
 	exclude = load Exclude Exclude->PATH;
+	pathmod = load Pathmod Pathmod->PATH;	
+	stringmod = load String String->PATH;
+	utils = load Utils Utils->PATH;
 
-	REPOPATH = repopath;
-	utils->init(REPOPATH, debug);
-	exclude->init(REPOPATH :: nil);
+	repopath = hd arglist;
+	mntpt = hd (tl arglist);
+	indexpath = repopath + ".git/gitfsindex";
 
+	utils->init(arglist, debug);
+	pathmod->init(repopath);
+
+
+#	exclude->init(REPOPATH :: nil);
+
+
+	return ref initindex();
+}
+
+initindex(): Index
+{
 	index: Index;
 	index.header = Header.new();
 	index.hashcap = 37;
 	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
-	return ref index;
+	return index;
 }
 
 #FIXME: Use addentry
-Index.addfile(index: self ref Index, path : string) : int
+Index.addfile(index: self ref Index, path : string): string 
 {
-	if(!verifypath(REPOPATH + path)){
-		error(sprint("wrong path: %r\n"));
-		return -1;
-	}
-	if(exclude->excluded(path)) return -1;
+	debugmsg("in index addfile\n");
+#no need for verification
+#	if(!verifypath(mntpt + path)){
+#		error(sprint("wrong path: %r\n"));
+#		return -1;
+#	}
+	#FIXME: Exclude code should be modified to be specific for each branch
+#	if(exclude->excluded(path)) return -1;
 
+	debugmsg("gitindex/addfile before if statement\n");
 	index.header.entriescnt++;
 	if(index.header.entriescnt * CLSBND >= index.hashcap){
 		oldentries := index.entries.all();
@@ -74,8 +99,15 @@ Index.addfile(index: self ref Index, path : string) : int
 		}
 	}
 
-	sha1 := writeblobfile(REPOPATH + path);
-	entry := initentry(path);
+	debugmsg("gitindex/addfile before writeblobfile\n");
+	fullpath := repopath + getentrypath(path);
+	makeabsentdirs(dirname(fullpath));
+	sha1 := writeblobfile(fullpath);
+	debugmsg("gitindex/addfile after writeblobfile\n");
+
+	#only path from master/tree is needed
+	entry := initentry(getentrypath(path));
+	sys->print("adding entry(%s) with name %s to %s\n", fullpath, entry.name, sha2string(sha1));
 	entry.sha1 = sha1;
 	if((elem := index.entries.find(entry.name)) != nil){
 		copyentry(elem, entry);
@@ -86,7 +118,53 @@ Index.addfile(index: self ref Index, path : string) : int
 
 	debugmsg(sprint("File added: %s\n", sha2string(entry.sha1)));
 
-	return 0;
+	return sha2string(entry.sha1);
+}
+
+writeblobfile(path: string): array of byte
+{
+	fd := sys->open(path, Sys->OREAD);
+	(ret, dirstat) := sys->stat(path);
+	if(ret == -1){
+		error(sprint("file %s for adding for index isn't found\n", path));
+		return nil;
+	}
+
+	buf := array[Sys->ATOMICIO] of byte;
+	ch := chan of (int, array of byte);
+	sha1: array of byte;
+	sz: int;
+	
+	spawn utils->writesha1file(ch);
+	temp := sys->aprint("blob %bd", dirstat.length);
+	buf[:] = temp;
+	buf[len temp] = byte 0;
+	cnt := len temp + 1;
+	while(1){
+		ch <-= (cnt, buf);
+		if(cnt == 0){
+			(sz, sha1) = <-ch;
+			break;
+		}
+		cnt = sys->read(fd, buf, len buf);
+	}
+
+	return sha1;
+}
+
+Index.removeentries(index: self ref Index): ref Index
+{
+	return ref initindex();
+}
+
+getentrypath(path: string): string
+{
+	#FIXME: code should take into account commit tags, and dirs named tree
+
+	sep := "/tree/";
+	(s1, s2) := stringmod->splitstrr(path, sep); 
+
+	return s2;
 }
 
 Index.addentry(index: self ref Index, entry: ref Entry)
@@ -106,30 +184,7 @@ Index.addentry(index: self ref Index, entry: ref Entry)
 	index.entries.add(entry.name, entry);
 }
 
-writeblobfile(path: string): array of byte
-{
-	fd := sys->open(path, Sys->OREAD);
-	(ret, dirstat) := sys->stat(path);
-	buf := array[Sys->ATOMICIO] of byte;
-	ch := chan of (int, array of byte);
-	sha1: array of byte;
-	sz: int;
-	
-	temp := array of byte sys->sprint("blob %bd", dirstat.length);
-	spawn utils->writesha1file(ch);
-	buf[:] = temp;
-	buf[len temp] = byte 0;
-	cnt := len temp + 1;
-	while(1){
-		ch <-= (cnt, buf);
-		if(cnt == 0){
-			(sz, sha1) = <-ch;
-			break;
-		}
-		cnt = sys->read(fd, buf, len buf);
-	}
-	return sha1;
-}
+
 
 Index.rmfile(index: self ref Index, path : string) 
 {
@@ -145,16 +200,23 @@ Header.new(): ref Header
 {
 	header: Header;
 	header.signature = CACHESIGNATURE;
-	header.version   = 1;
+	header.version   = 2;
 	header.entriescnt = 0;
-	header.sha1 = array[SHALEN] of byte;
+
 	return ref header;
 }
 
-#return: number of elements read from index file
-Index.readindex(index: self ref Index, path : string) : int
+readindex(index:ref Index): int
 {
-	indexfd := sys->open(REPOPATH + path, Sys->OREAD);
+	return readindexfrom(index, indexpath);
+}
+
+
+#return: number of elements read from index file
+readindexfrom(index:ref Index, path : string) : int
+{
+	debugmsg(sprint("index path is %s\n", indexpath));
+	indexfd := sys->open(indexpath, Sys->OREAD);
 
 	if(indexfd == nil){
 		error(sprint("file access error: %r\n"));
@@ -163,22 +225,18 @@ Index.readindex(index: self ref Index, path : string) : int
 
 	header := array[HEADERSZ] of byte;
 
+	#skiping sha1 of the git index
+	sys->seek(indexfd, big SHALEN, Sys->SEEKSTART);
+
 	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ){
 		error(sprint("Index format error: %r\n"));
 		return -1;
 	}
 
-	index.header = Header.pack(header);
+	index.header = Header.unpack(header);
 
 	state: ref Keyring->DigestState = nil;
-	temp := int2bytes(index.header.signature);
-	state = keyring->sha1(temp, len temp, nil, state);
-
-	temp = int2bytes(index.header.version);
-	state = keyring->sha1(temp, len temp, nil, state);
-
-	temp = int2bytes(index.header.entriescnt);
-	state = keyring->sha1(temp, len temp, nil, state);
+	keyring->sha1(header, len header, nil, state);
 
 	index.hashcap = index.header.entriescnt * CLSBND * 2;
 
@@ -186,46 +244,100 @@ Index.readindex(index: self ref Index, path : string) : int
 
 	for(i := 0; i < index.header.entriescnt; i++){
 		entrybuf := array[ENTRYSZ] of byte;
-
-		ret := sys->read(indexfd, entrybuf, ENTRYSZ);
-		if(ret != ENTRYSZ){
+		cnt := sys->read(indexfd, entrybuf, ENTRYSZ);
+		if(cnt != ENTRYSZ){
 			error(sprint("index file error: %r\n"));
 			return 0;
 		}
 
 		state = keyring->sha1(entrybuf, len entrybuf, nil, state);
-		entry := Entry.pack(entrybuf); 
-		namebuf := array[entry.namelen] of byte;
-		sys->read(indexfd, namebuf, entry.namelen);
+		entry := Entry.unpack(entrybuf); 
+		namelen := entry.flags & 16r0fff;
+		namebuf := array[namelen] of byte;
+		sys->read(indexfd, namebuf, namelen);
 		entry.name = string namebuf;	
 		index.entries.add(entry.name, entry);
 		state = keyring->sha1(namebuf, len namebuf, nil, state);
-	
 
-		#each entry is aligned by 8  
-		remainder : int;
-		remainder = (ENTRYSZ + entry.namelen + 8) & ~7; 
-		remainder -= ENTRYSZ + entry.namelen;
-		sys->read(indexfd, entrybuf, remainder);
 	}
 
 	sha1 := array[SHALEN] of byte;
-	keyring->sha1(temp, 0, sha1, state);
-	if(!verifyheader(index.header, sha1)){
+	realsha1 := array[SHALEN] of byte;
+	sys->read(indexfd, realsha1, len realsha1);
+	keyring->sha1(nil, 0, sha1, state);
+	if(!comparebytes(sha1, realsha1)){
 		error("header is not correct\n");
 		return -1;
 	}
+
 	return index.header.entriescnt;
 }
 
-#return: number of elements written to the index file
-Index.writeindex(index: self ref Index, path : string) : int
+sizeofrest(fd: ref Sys->FD): big  
 {
-	fd := sys->create(REPOPATH + path, Sys->OWRITE, 8r644);
+	curpos := sys->seek(fd, big 0, Sys->SEEKRELA);
+	rest := sys->seek(fd, big 0, Sys->SEEKEND) - curpos;
+	sys->seek(fd, curpos, Sys->SEEKSTART);
+
+	return rest;
+}
+
+Index.getentries(index:self ref Index, stage: int): list of ref Entry
+{
+	ret: list of ref Entry;
+	entries := index.entries.all();
+	while(entries != nil){
+		entry := hd entries;
+		if(entrystage(entry) == stage){
+			ret = entry :: ret;
+		}
+		entries = tl entries;
+	}
+	
+	return ret; 
+}
+
+entrystage(e: ref Entry): int
+{
+	return (e.flags & STAGEMASK) >> STAGESHIFT;
+}
+
+lock(): int
+{
+	lockpath := repopath + ".git/index.lock";	
+	(ret, nil) := sys->stat(lockpath);
+	if(ret != -1){
+		sys->sleep(120);
+		(ret, nil) := sys->stat(lockpath);
+	}
+	return ret == -1;
+}
+
+unlock()
+{
+	sys->remove(repopath + ".git/index.lock");
+}
+
+writeindex(index:ref Index): int
+{
+	if(!lock())
+		return 0;
+	ret := writeindexto(index, indexpath);
+	unlock();
+	return ret;
+}
+
+#return: number of elements written to the index file
+writeindexto(index:ref Index, path : string) : int
+{
+	fd := sys->open(path, Sys->OWRITE);
 	if(fd == nil){
 		error(sprint("write index error: %r\n"));
 		return 0;
 	}
+
+	#skiping sha1 of the git's index file
+	sys->seek(fd, big SHALEN, Sys->SEEKSTART);
 
 	state: ref Keyring->DigestState = nil;
 	temp := int2bytes(index.header.signature);
@@ -237,175 +349,118 @@ Index.writeindex(index: self ref Index, path : string) : int
 	temp = int2bytes(index.header.entriescnt);
 	state = keyring->sha1(temp, len temp, nil, state);
 
-	for(l := index.entries.all(); l != nil; l = tl l){
-		temp = (hd l).unpack();
-		state = keyring->sha1(temp, len temp, nil, state);
-	}
-
-	keyring->sha1(temp, 0, index.header.sha1, state);
-	header := index.header.unpack();
+	header := index.header.pack();
 	sys->write(fd, header, len header);
 
-	entrybuf: array of byte;
 	cnt := 0;
-	for(l = index.entries.all(); l != nil; l = tl l)
+	entrybuf: array of byte;
+	for(l := index.entries.all(); l != nil; l = tl l)
 	{
-		entrybuf = (hd l).unpack();
-
+		entrybuf = (hd l).pack();
 		cnt := sys->write(fd, entrybuf, len entrybuf);
 		if(cnt != len entrybuf){
 			error(sprint("couldn't write entry to the file: %r\n"));
 			return cnt;
 		}
-		#each entry is aligned by 8  
-		remainder : int;
-		remainder = (ENTRYSZ + (hd l).namelen + 8) & ~7; 
-		remainder -= ENTRYSZ + (hd l).namelen;
-		sys->write(fd, array[remainder] of byte, remainder);
+		keyring->sha1(entrybuf, len entrybuf, nil, state);
+
 	}
+
+	sha1 := array[SHALEN] of byte;
+	keyring->sha1(nil, 0, sha1, state);
+	sys->write(fd, sha1, len sha1);
 
 	return index.header.entriescnt;
 }
 
-Header.pack(buf : array of byte) : ref Header
+
+
+
+Header.unpack(buf : array of byte) : ref Header
 {
 	ret : Header;
-	offset := 0;
 
-	ret.signature = bytes2int(buf,offset);
-	offset += INTSZ;
-	
+
+	ret.signature = bytes2int(buf, 0);
+	offset := INTSZ;
+
 	ret.version = bytes2int(buf,offset);
 	offset += INTSZ;
 	
 	ret.entriescnt = bytes2int(buf,offset);
 	offset += INTSZ;
 	
-	ret.sha1 = buf[offset: offset + SHALEN];
-	
 	return ref ret;
 }
 
-Header.unpack(header : self ref Header) : array of byte
+Header.pack(header : self ref Header) : array of byte
 {
 	ret := array[HEADERSZ] of byte;
 
-	offset := 0;
 	
-	temp := int2bytes(header.signature);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
+	ret[:] = int2bytes(header.signature);
+	offset := INTSZ;
 
-	temp = int2bytes(header.version);
-	copyarray(ret, offset,  temp, 0, len temp);
-	offset += len temp;
+	ret[offset:] = int2bytes(header.version);
+	offset += INTSZ;
 
-	temp = int2bytes(header.entriescnt);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-	
-
-	copyarray(ret, offset, header.sha1, 0, SHALEN);
+	ret[offset:] = int2bytes(header.entriescnt);
 
 	return ret;
 }
 
-Entry.unpack(entry : self ref Entry) : array of byte
+Entry.pack(entry : self ref Entry) : array of byte
 {
-	ret := array[ENTRYSZ + entry.namelen] of byte;
+	ret := array[ENTRYSZ + len entry.name] of byte;
 
 	offset := 0;
 
-	temp := unpackqid(entry.qid);
-	copyarray(ret, offset, temp, 0, len temp);
+	temp := packqid(ref entry.qid);
+	ret[:] = temp;
 	offset += QIDSZ;
 	
-	temp = int2bytes(entry.dtype);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	temp = int2bytes(entry.dev);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-	
-	temp = int2bytes(entry.mtime);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	temp = int2bytes(entry.mode);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	temp =  big2bytes(entry.length);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	copyarray(ret, offset, entry.sha1, 0, SHALEN);
+	ret[offset:] = entry.sha1;
 	offset += SHALEN;
 
-	temp = int2bytes(entry.namelen);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	temp = array of byte entry.name;
-	copyarray(ret, offset, temp, 0, len temp);
+	ret[offset:] = int2bytes(entry.flags);
+	offset += INTSZ;
+	
+	ret[offset:] = sys->aprint("%s", entry.name); 
 
 	return ret;
 }
 
-Entry.pack(buf : array of byte) : ref Entry
+read := 0;
+Entry.unpack(buf : array of byte) : ref Entry
 {
 	entry: Entry;
 
 	offset := 0;
 
-	entry.qid = packqid(buf, offset);
+	if(!read){
+		outfd := sys->create("/usr/manzur/haha/mega2", Sys->OWRITE, 8r644);
+		sys->write(outfd, buf, QIDSZ);
+		read = !read;
+	}
+	entry.qid = unpackqid(buf, offset);
 	offset += QIDSZ;
-
-	entry.dtype = bytes2int(buf, offset);
-	offset += INTSZ;
-	
-	entry.dev = bytes2int(buf, offset);
-	offset += INTSZ;
-	
-	entry.mtime = bytes2int(buf, offset);
-	offset += INTSZ;
-
-	entry.mode = bytes2int(buf, offset);
-	offset += INTSZ;
-
-	entry.length = bytes2big(buf, offset);
-	offset += BIGSZ;
 
 	entry.sha1 = buf[offset : offset + SHALEN];
 	offset += SHALEN;
 
-	entry.namelen = bytes2int(buf, offset);
+	entry.flags = bytes2int(buf, offset);
 	offset += INTSZ;
 
+#FIXME: read also entry.name
 	return ref entry;
 }
 
-packqid(buf: array of byte, offset: int): Sys->Qid
-{
- 	qid: Sys->Qid;
-
-	qid.path = bytes2big(buf, offset); 
-	offset += BIGSZ;
-
-	qid.vers = bytes2int(buf, offset);
-	offset += INTSZ;
-
-	qid.qtype = bytes2int(buf, offset);
-	
-	return qid;
-}
 
 initentry(filename: string): ref Entry
 {
 	entry: Entry;
 
-	(retval, dirstat) := sys->stat(REPOPATH + filename);
+	(retval, dirstat) := sys->stat(repopath + filename);
 	if(retval != 0)
 	{
 		error(sprint("stat error: %r\n"));
@@ -413,14 +468,8 @@ initentry(filename: string): ref Entry
 	}
 	
 	entry.qid = dirstat.qid;
-	entry.dtype = dirstat.dtype;
-	entry.dev = dirstat.dev;
-	entry.mtime = dirstat.mtime;
-	entry.mode = dirstat.mode;
-	entry.length = dirstat.length;
-	entry.sha1 = filesha1(filename); 
-	entry.namelen = len filename;
 	entry.name = filename;
+	entry.flags = len filename & 16r0fff;
 
 	return ref entry;
 }
@@ -429,54 +478,31 @@ initentry(filename: string): ref Entry
 
 verifypath(path : string) : int
 {
-	return sys->open(path, Sys->OREAD) != nil;
+	return !sys->stat(path).t0;
 }
 
 verifyheader(header: ref Header, sha1: array of byte): int
 {
-	return  equalshas(header.sha1, sha1) &&	
-		header.signature == CACHESIGNATURE &&
-		header.version == 1 &&
-		header.entriescnt >= 0;
-}
+	return 1;
 
-unpackqid(qid : Sys->Qid) : array of byte
-{
-	ret := array[QIDSZ] of byte;
-	
-	offset := 0;
-
-	temp := big2bytes(qid.path);
-	copyarray(ret, 0, temp, 0, len temp);
-	offset += len temp;
-
-	temp = int2bytes(qid.vers);
-	copyarray(ret, offset, temp, 0, len temp);
-	offset += len temp;
-
-	temp = int2bytes(qid.qtype);
-	copyarray(ret, offset, temp, 0, len temp);
-
-	return ret;
+#	return  equalshas(header.sha1, sha1) &&	
+#		header.signature == CACHESIGNATURE &&
+#		header.version == 1 &&
+#		header.entriescnt >= 0;
 }
 
 copyentry(dst, src: ref Entry)
 {
 	dst.qid = src.qid;
-	dst.dtype = src.dtype;
-	dst.dev = src.dev;
-	dst.mtime = src.mtime;
-	dst.mode = src.mode;
-	dst.length = src.length;
 	dst.sha1 = src.sha1;
-	dst.namelen = src.namelen;
+	dst.flags = src.flags;
 	dst.name = src.name;
 }	
 
 Entry.compare(e1: self ref Entry, e2: ref Entry): int
 {
-	namelen := e1.namelen;
-	if(e2.namelen < namelen) namelen = e2.namelen;
+	namelen := len e1.name;
+	if(len e2.name < namelen) namelen = len e2.name;
 
 	for(i := 0; i < namelen; i++)
 	{
@@ -485,9 +511,9 @@ Entry.compare(e1: self ref Entry, e2: ref Entry): int
 		else if(e1.name[i] > e2.name[i])
 			return -1;
 	}
-	if(e1.namelen < e2.namelen)
+	if(len e1.name < len e2.name)
 		return 1;
-	else if(e1.namelen > e2.namelen)
+	else if(len e1.name > len e2.name)
 		return -1;
 	return 0;
 }
@@ -496,16 +522,26 @@ Entry.new(): ref Entry
 {
 	entry: Entry;
 	entry.qid = Sys->Qid(big 0,0,0);
-	entry.dtype = 0;
-	entry.dev = 0;
-	entry.mtime = 0;
-	entry.mode = 0;
-	entry.length = big 0;
 	entry.sha1 = array[SHALEN] of byte;
-	entry.namelen = 0;
+	entry.flags = 0;
 	entry.name = "";
 
 	return ref entry;
+}
+
+ntohl(num: int): int
+{
+	return (ntohs(num) << 16) | (ntohs(num >> 16));
+}
+
+
+ntohs(num: int): int
+{
+	ret := num & 16rff;
+	num >>= 8;
+	ret = (ret << 8) | (num & 16rff);
+
+	return ret;
 }
 
 

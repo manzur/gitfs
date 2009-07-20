@@ -36,7 +36,8 @@ init(args: list of string, debug: int)
 	REPOPATH = hd args;
 	sys->print("Initializing git repo\n");
 
-	Index.new(REPOPATH, debug);
+#FIXME: Replace "" with MNTPT
+	Index.new(REPOPATH, "",debug);
 
 	header := Header.new();
 	temp := header.unpack()[:HEADERSZ - SHALEN];

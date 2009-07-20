@@ -2,5 +2,5 @@
 Log: module
 {
 	PATH: con "/dis/git/log.dis";
-	init: fn(ch: chan of array of byte, args: list of string, debug: int);
+	init: fn(arglist: list of string, ch: chan of array of byte, debug: int);
 };
