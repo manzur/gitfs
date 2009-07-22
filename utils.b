@@ -71,10 +71,11 @@ writesha1file(ch: chan of (int, array of byte))
 {
 
 #FIXME: make deflate level more configurable
-	rqchan := deflate->start("z9");
+	rqchan := deflate->start("z1");
 	old := array[0] of byte;
 	buf: array of byte;
-	remainder := sz := 0;
+	sz := 0;
+	state: ref Keyring->DigestState;
 mainloop:
 	while(1)
 	{
@@ -92,31 +93,20 @@ mainloop:
 				rq.reply <-= 0;
 
 			Fill => 
-				if(!remainder)
-					(sz, buf) = <-ch;	
-				else{
-					buf = buf[remainder:];
-					sz = len buf;
-				}
-				if(len rq.buf < sz){
-					remainder = len rq.buf; 
-					rq.buf[:] = buf[:remainder];
-					rq.reply <-= remainder;
-					continue mainloop;
-				}
+				(sz, buf) = <-ch;
+				state = keyring->sha1(buf, sz, nil, state);
 				rq.buf[:] = buf[:];
 				rq.reply <-= sz;
-				remainder = 0;
 			Error =>
 				error(sprint("error ocurred: %s\n", rq.e));
 				return;
 		}
 	}
 		
-	sha := bufsha1(old);		    
-	save2file(string2path(sha2string(sha)), old);
-	debugmsg(sprint("file was written to: %s\n", sha2string(sha)));
-	ch <-= (SHALEN, sha);	
+	sha1 := array[SHALEN] of byte;
+	keyring->sha1(nil, 0, sha1, state);
+	save2file(string2path(sha2string(sha1)), old);
+	ch <-= (SHALEN, sha1);	
 }
 
 readsha1file(shafilename: string): (string, int, array of byte)
@@ -198,8 +188,7 @@ bufsha1(buf: array of byte): array of byte
 {
 	sha := array[SHALEN] of byte;
 #FIXME: ERRR
-	state := keyring->sha1(buf, len buf, nil, nil);
-	keyring->sha1(nil, 0, sha, state);
+	keyring->sha1(buf, len buf, sha, nil);
 
 	return sha;
 }

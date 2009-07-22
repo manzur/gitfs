@@ -11,6 +11,9 @@ include "daytime.m";
 
 include "draw.m";
 
+include "string.m";
+	stringmod: String;
+
 include "tables.m";
 	tables: Tables;
 Table, Strhash: import tables;
@@ -47,6 +50,7 @@ index: ref Index;
 init(arglist: list of string, debug: int, ind: ref Index, shat: ref Strhash[ref Shaobject])
 {
 	sys = load Sys Sys->PATH;
+	stringmod = load String String->PATH;
 	tables = load Tables Tables->PATH;
 
 	commitmod = load Commitmod Commitmod->PATH;

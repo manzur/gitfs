@@ -71,7 +71,7 @@ readtree: import readtreemod;
 
 include "utils.m";
 	utils: Utils;
-debugmsg, error, sha2string, splitl, SHALEN: import utils;
+bufsha1, debugmsg, error, sha2string, splitl, SHALEN: import utils;
 
 include "write-tree.m";
 	writetreemod: Writetree;
@@ -412,7 +412,6 @@ mainloop:
 	while((gm := <-tmsgchan) != nil){
 		pick m := gm{
 			Stat => 
-				sys->print("in process/stat\n");
 				fid := srv.getfid(m.fid); 
 				direntry := table.find(string fid.path);
 				if(direntry == nil || fid.qtype == Sys->QTDIR){
@@ -658,7 +657,6 @@ mainloop:
 				
 				#parent dir is commit type, renaming tree dir to commit dir
 				if(ptype == "commit" &&  direntry.name == "tree" && m.stat.name == "commit"){
-					sys->write(sys->fildes(1), commitmsg, len commitmsg);
 					treesha1 := writetree(index);
 					sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, string commitmsg);
 					sys->print("commited to: %s\n", sha1);
@@ -672,7 +670,7 @@ mainloop:
 			Clunk =>
 				fid := srv.getfid(m.fid);
 				if(fid.path == QRoot){
-					sys->print("ret ==> %d\n", writeindex(index));
+					writeindex(index);
 				}
 #				queries := readqueries.find(m.tag);
 #				newqueries: list of Readmdata;
@@ -712,6 +710,8 @@ checkout(parent: ref Direntry, direntry: ref Direntry)
 {
 	cleandir(repopath[:len repopath-1]);
 	index = checkoutmod->checkout(parent.object.sha1);
+	l1 := index.entries.all();
+	pp := hd l1;
 	removeentry(QIndex);
 	initindex();
 	treepath := big 0;
@@ -741,7 +741,6 @@ addentry(ppath: big, name, sha1: string, dirstat: ref Sys->Dir, otype: string): 
 	parent := table.find(string ppath);
 	parent.object.children = path :: parent.object.children;
 
-	sys->print("add entry: parent = %bd, path = %bd, name %s\n", parent.path, path, name);
 	return direntry.path;
 }
 
@@ -783,7 +782,6 @@ mainloop:
 					name1 := dirstat.name;
 					name2 := navop.name;
 					if(dirstat.name == navop.name){
-						sys->print("matching in walking\n");
 						if(dirstat.qid.qtype & Sys->QTDIR){
 							debugmsg("dir is matched\n");
 							ppwd = cwd;

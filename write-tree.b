@@ -26,7 +26,7 @@ Index, Entry: import gitindex;
 
 include "utils.m";
 	utils: Utils;
-sha2string, SHALEN: import utils;
+bufsha1, sha2string, SHALEN: import utils;
 
 index: ref Index;
 repopath: string;
@@ -63,7 +63,7 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	while(entrylist != nil)
 	{
 		entry := hd entrylist;
-		if(len basename >= len entry.name || !stringmod->prefix(basename, entry.name))
+		if(!stringmod->prefix(basename, entry.name))
 			break;
 
 		sha1 := entry.sha1;
@@ -99,8 +99,10 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	}
 
 	header := sys->aprint("tree %bd", big offset);
+#	header := sys->aprint("tree %bd", big 0);
+	
 
-	#+1 is for 0 byte,which is used as a separator
+#	#+1 is for 0 byte,which is used as a separator
 	buf := array[len header + offset + 1] of byte;
 	buf[:] = header[:];
 	buf[len header] = byte 0;
@@ -115,6 +117,7 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	(sz, sha) = <-ch;
 
 
+	sys->print("tree is written to %s\n", sha2string(sha));
 	return (sha, entrylist);
 }
 
