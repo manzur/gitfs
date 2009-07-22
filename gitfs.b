@@ -736,13 +736,14 @@ removefile(direntry: ref Direntry)
 
 removedir(direntry: ref Direntry)
 {
+	sys->print("removing dir: %s\n", direntry.name);
 	l := direntry.object.children;
 	while(l != nil){
 		child := table.find(string hd l);
 		removefile(child);
 		l = tl l;
 	}
-	sys->remove(direntry.object.sha1);
+	removefile(direntry);
 }
 
 
