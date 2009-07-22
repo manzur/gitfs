@@ -137,7 +137,7 @@ getcommitterinfo(): string
 	mail := user + "@" + hostname;
 
 	date := daytime->time(); 
-	info := "committer " + user + " <" + mail+ "> " + date + "\n";
+	info := "committer " + user + " <" + mail+ "> " + date + "\n\n";
 
 	return info;
 }

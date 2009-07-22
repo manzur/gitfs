@@ -638,11 +638,30 @@ mainloop:
 					sys->print("removing entry from index\n");
 					parent := table.find(string direntry.parent);
 					(nil, filepath) := stringmod->splitstrr(direntry.getfullpath(),"index/");
+					tt: ref Direntry;
 					index.rmfile(filepath);
 					removechild(parent, fid.path);
 					removeentry(direntry.path);
 					srv.delfid(fid);
 					qid := direntry.object.dirstat.qid;
+					srv.reply(ref Rmsg.Remove(m.tag));
+					continue mainloop;
+				}
+				else if(istreedir(direntry)){
+					parent := getrecentcommit(fid.path);
+					if(parent != workingdir){
+						checkout(parent, direntry);
+					}
+				}
+				if(direntry.object.otype == "work"){
+					sys->print("removing from working dir\n");
+					if(direntry.getdirstat().mode & Sys->DMDIR){
+						removedir(direntry);
+					}
+					else{
+						removefile(direntry);
+					}
+					srv.delfid(fid);
 					srv.reply(ref Rmsg.Remove(m.tag));
 					continue mainloop;
 				}
@@ -705,6 +724,27 @@ printlistofstring(l: list of string)
 	}
 	sys->print("-------------------\n");
 }
+
+removefile(direntry: ref Direntry)
+{
+	sys->print("removing file: %s\n", direntry.object.sha1);
+	sys->remove(direntry.object.sha1);
+	parent := table.find(string direntry.parent); 
+	removechild(parent, direntry.path);
+	removeentry(direntry.path);
+}
+
+removedir(direntry: ref Direntry)
+{
+	l := direntry.object.children;
+	while(l != nil){
+		child := table.find(string hd l);
+		removefile(child);
+		l = tl l;
+	}
+	sys->remove(direntry.object.sha1);
+}
+
 
 checkout(parent: ref Direntry, direntry: ref Direntry)
 {
