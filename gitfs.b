@@ -313,7 +313,7 @@ fillindexdir(parent: ref Direntry, stage: int)
 		parent = oldparent;
 
 		name: string;
-		(q, name) = makeabsententries(q, parent, entry.name, dirstat);
+		(q, parent, name) = makeabsententries(q, parent, entry.name, dirstat);
 
 		dirstat = sys->stat(string2path(sha1)).t1;
 		dirstat.mode = 8r644;
@@ -327,7 +327,7 @@ fillindexdir(parent: ref Direntry, stage: int)
 	}
 }
 
-makeabsententries(q: big, parent: ref Direntry, name: string, dirstat: Sys->Dir): (big, string)
+makeabsententries(q: big, parent: ref Direntry, name: string, dirstat: Sys->Dir): (big, ref Direntry, string)
 {
 	(dirname, rest) := basename(name);
 	while(dirname != nil){
@@ -343,7 +343,7 @@ makeabsententries(q: big, parent: ref Direntry, name: string, dirstat: Sys->Dir)
 		(dirname, rest) = basename(rest);
 	}
 
-	return (q, rest);
+	return (q, parent, rest);
 }
 
 mapworkingtree(path: big)
@@ -606,7 +606,7 @@ mainloop:
 							removechild(parent, child.path);
 							removeentry(child.path);
 						}
-						(q, direntry1.name) = makeabsententries(q, parent, direntry1.name, *direntry1.object.dirstat);
+						(q, parent, direntry1.name) = makeabsententries(q, parent, direntry1.name, *direntry1.object.dirstat);
 
 						#If no parents were absent we should decrement QMax to avoid junk qid.path
 						if(q == q1) QMax--;
