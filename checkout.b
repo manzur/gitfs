@@ -47,7 +47,7 @@ shatable: ref Strhash[ref Shaobject];
 commit, mntpt, repopath: string;
 index: ref Index;	
 
-init(arglist: list of string, debug: int, ind: ref Index, shat: ref Strhash[ref Shaobject])
+init(arglist: list of string, debug: int, ind: Index, shat: ref Strhash[ref Shaobject])
 {
 	sys = load Sys Sys->PATH;
 	stringmod = load String String->PATH;
@@ -61,7 +61,7 @@ init(arglist: list of string, debug: int, ind: ref Index, shat: ref Strhash[ref 
 
 	commitmod->init(arglist, debug);
 	index = Index.new(arglist, debug);
-	index.header = ind.header;
+	*index.header = *ind.header;
 	index.header.entriescnt = 0;
 	pathmod->init(repopath);
 	treemod->init(arglist, debug);
@@ -76,7 +76,6 @@ init(arglist: list of string, debug: int, ind: ref Index, shat: ref Strhash[ref 
 checkout(sha1: string): ref Index
 {
 	commit := readcommit(sha1);
-	pt := index;
 	index = index.removeentries();
 	checkouttree(repopath[:len repopath-1], commit.treesha1);
 	

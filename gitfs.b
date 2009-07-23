@@ -96,6 +96,7 @@ nav: ref Navigator;
 readqueries: ref Table[list of Readquery];
 srv: ref Styxserver;
 repopath: string;
+rootfid: int;
 shatable: ref Strhash[ref Shaobject];
 table: ref Strhash[ref Direntry];
 workingdir: ref Direntry;
@@ -159,9 +160,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->pctl(Sys->NEWPGRP, nil);
 	inittable();
 
-	checkoutmod->init(arglist, debug, index, shatable);
-	debugmsg(sprint("repopath: %s\n", repopath));
-
+	checkoutmod->init(arglist, debug, *index, shatable);
 
 	styx->init();
 	styxservers->init(styx);
@@ -411,6 +410,9 @@ process(srv: ref Styxserver, tmsgchan: chan of ref Tmsg)
 mainloop:
 	while((gm := <-tmsgchan) != nil){
 		pick m := gm{
+			Attach =>
+				rootfid = m.fid;
+				srv.default(m);
 			Stat => 
 				fid := srv.getfid(m.fid); 
 				direntry := table.find(string fid.path);
@@ -638,12 +640,8 @@ mainloop:
 					sys->print("removing entry from index\n");
 					parent := table.find(string direntry.parent);
 					(nil, filepath) := stringmod->splitstrr(direntry.getfullpath(),"index/");
-					tt: ref Direntry;
-					index.rmfile(filepath);
-					removechild(parent, fid.path);
-					removeentry(direntry.path);
+					removeindexentry(direntry, parent);
 					srv.delfid(fid);
-					qid := direntry.object.dirstat.qid;
 					srv.reply(ref Rmsg.Remove(m.tag));
 					continue mainloop;
 				}
@@ -688,7 +686,7 @@ mainloop:
 
 			Clunk =>
 				fid := srv.getfid(m.fid);
-				if(fid.path == QRoot){
+				if(m.fid == rootfid){
 					writeindex(index);
 				}
 #				queries := readqueries.find(m.tag);
@@ -746,6 +744,25 @@ removedir(direntry: ref Direntry)
 	removefile(direntry);
 }
 
+
+removeindexentry(direntry, parent: ref Direntry)
+{
+	dirstat := direntry.getdirstat();
+	if(dirstat.mode & Sys->DMDIR){
+		l := direntry.object.children;
+		while(l != nil){
+			child := table.find(string hd l);
+			removeindexentry(child, direntry);
+			l = tl l;
+		}
+	}
+	else{
+		(nil, filepath) := stringmod->splitstrr(direntry.getfullpath(),"index/");
+		index.rmfile(filepath);
+	}
+	removechild(parent, direntry.path);
+	removeentry(direntry.path);
+}
 
 checkout(parent: ref Direntry, direntry: ref Direntry)
 {

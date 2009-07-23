@@ -59,9 +59,9 @@ Index.new(arglist: list of string, debug: int): ref Index
 
 #	exclude->init(REPOPATH :: nil);
 
-
 	return ref initindex();
 }
+
 
 initindex(): Index
 {
@@ -239,7 +239,6 @@ readindexfrom(index:ref Index, path : string) : int
 	keyring->sha1(header, len header, nil, state);
 
 	index.hashcap = index.header.entriescnt * CLSBND * 2;
-
 	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
 	for(i := 0; i < index.header.entriescnt; i++){
@@ -430,18 +429,12 @@ Entry.pack(entry : self ref Entry) : array of byte
 	return ret;
 }
 
-read := 0;
 Entry.unpack(buf : array of byte) : ref Entry
 {
 	entry: Entry;
 
 	offset := 0;
 
-	if(!read){
-		outfd := sys->create("/usr/manzur/haha/mega2", Sys->OWRITE, 8r644);
-		sys->write(outfd, buf, QIDSZ);
-		read = !read;
-	}
 	entry.qid = unpackqid(buf, offset);
 	offset += QIDSZ;
 
