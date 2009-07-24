@@ -1,44 +1,19 @@
 implement Commitmod;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
+
 sprint: import sys;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;	
-
-include "daytime.m";
-	daytime: Daytime;
 gmt, Tm: import daytime;	
-
-include "lists.m";
-	lists: Lists;
-	
-include "string.m";
-	stringmod: String;
-
-include "tables.m";
-	tables: Tables;
-Strhash: import tables;	
-
-include "utils.m";
-	utils: Utils;
 error, ltrim, readsha1file: import utils;	
 
-include "commit.m";
 
-init(arglist: list of string, debug: int)
+mods: Mods;
+
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	bufio = load Bufio Bufio->PATH;
-	daytime = load Daytime Daytime->PATH;
-	lists = load Lists Lists->PATH;
-	stringmod = load String String->PATH;
-	tables = load Tables Tables->PATH;	
-
-	utils = load Utils Utils->PATH;
-	utils->init(arglist, debug);
+	mods = m;
 }
 
 parsedate(date: string): ref Tm

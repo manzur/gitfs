@@ -1,53 +1,18 @@
 implement Writetree;
 
-include "write-tree.m";
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
 
-include "sys.m";
-	sys: Sys;
 sprint: import sys;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;
-
-include "filter.m";
-	deflate: Filter;
-
-include "string.m";
-	stringmod: String;
-
-include "tables.m";
-	tables: Tables;
-Strhash: import tables;
-
-include "gitindex.m";
-	gitindex: Gitindex;
 Index, Entry: import gitindex;
-
-include "utils.m";
-	utils: Utils;
 bufsha1, sha2string, SHALEN: import utils;
 
-index: ref Index;
-repopath: string;
-debug: int;
-
-init(arglist: list of string, deb: int)
+mods: Mods;
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-
-	deflate = load Filter Filter->DEFLATEPATH;
-	stringmod = load String String->PATH;
-	tables = load Tables Tables->PATH;
-
-	gitindex = load Gitindex Gitindex->PATH;
-	utils = load Utils Utils->PATH;
-
-	debug = deb;
-	repopath = hd arglist;
-
-	deflate->init();
-	utils->init(arglist, debug);
+	mods = m;
+	deflatefilter->init();
 }
 
 writetree(index: ref Index): string

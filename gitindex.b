@@ -1,67 +1,32 @@
 implement Gitindex;
 
-include "sys.m";
-	sys : Sys;
+include "gitfs.m";
+include "modules.m";
+include "mods.m";
+
 sprint: import sys;
 
-include "tables.m";
-	tables: Tables;
-
-Strhash : import tables;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;	
-
-include "gitindex.m";
-	gitindex : Gitindex;
-
-include "path.m";
-	pathmod: Pathmod;
 dirname, makeabsentdirs: import pathmod;	
 
-include "utils.m";
-	utils: Utils;
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
 debugmsg, error, bytes2int, bytes2big, big2bytes, comparebytes,int2bytes, filesha1, allocnr, packqid, sha2string, unpackqid, equalshas: import utils;
 
-include "exclude.m";
-	exclude: Exclude;
-
-include "string.m";
-	stringmod: String;
-
-include "keyring.m";
-	keyring: Keyring;
-
 filebuf: array of byte;
 
-indexpath, mntpt, repopath: string;
+indexpath: string;
+
+mods: Mods;
 
 Index.new(arglist: list of string, debug: int): ref Index
 {
-	sys = load Sys Sys->PATH;
-	tables = load Tables Tables->PATH;
-	keyring = load Keyring Keyring->PATH;
-
-	exclude = load Exclude Exclude->PATH;
-	pathmod = load Pathmod Pathmod->PATH;	
-	stringmod = load String String->PATH;
-	utils = load Utils Utils->PATH;
-
-	repopath = hd arglist;
-	mntpt = hd (tl arglist);
-	indexpath = repopath + ".git/gitfsindex";
-
-	utils->init(arglist, debug);
-	pathmod->init(repopath);
-
-
-#	exclude->init(REPOPATH :: nil);
-
 	return ref initindex();
 }
 
+init(m: Mods)
+{
+	mods = m;
+	indexpath = repopath + ".git/gitfsindex";
+}
 
 initindex(): Index
 {

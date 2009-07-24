@@ -9,7 +9,7 @@ Treemod: module
 		children: list of (int, string, string);
 	};
 
-	init: fn(arglist: list of string, debug: int);
+	init: fn(mods: Mods);
 	readtree: fn(sha1: string): ref Tree;
 	readtreebuf: fn(sha1: string, filebuf: array of byte): ref Tree;
 };

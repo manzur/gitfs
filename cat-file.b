@@ -1,49 +1,25 @@
 implement Catfile;
 
-include "sys.m";
-	sys: Sys;
-
-include "bufio.m";
-Iobuf: import Bufio;		
-
-include "tables.m";
-Strhash: import Tables;	
-
-include "utils.m";
-	utils: Utils;
-bytepos, sha2string, SHALEN: import utils;	
 	
-include "cat-file.m";
+include "gitfs.m";
+include "mods.m";
 
-msgchan: chan of array of byte;
+mods: Mods;
+include "modules.m";
+
+bytepos, sha2string, SHALEN: import utils;	
+
 printtypeonly := 0;
-repopath: string;
 
-init(arglist: list of string, ch: chan of array of byte, debug: int)
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	utils = load Utils Utils->PATH;
-
-	utils->init(arglist,  debug);
-
-	repopath = hd arglist;
-	arglist = tl tl arglist;
-	path := hd arglist; 
-
-#FIXME: use it or remove
-#	printtypeonly = typeonly;
-	msgchan = ch;
-	catfile(path);
+	mods = m;
 }
 
-catfile(path: string)
+catfile(path: string, msgchan: chan of array of byte)
 {
 	(filetype, nil, buf) := utils->readsha1file(path);	
 
-	if(printtypeonly){
-		msgchan <-= nil;
-		return;
-	}
 	str := "";
 	offset := 0;
 	while(filetype == "tree" && (pos := bytepos(buf, offset, byte 0)) != -1){
@@ -53,6 +29,7 @@ catfile(path: string)
 		str += " " + sha2string(sha1);
 		offset = pos + SHALEN;
 	}
+
 	if(filetype == "tree")
 		msgchan <-= sys->aprint("%s", str);
 	else

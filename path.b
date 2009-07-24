@@ -1,26 +1,16 @@
 implement Pathmod;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
+
 sprint: import sys;
 
-include "readdir.m";
-	readdir: Readdir;
+mods: Mods;
 
-include "workdir.m";
-	gwd: Workdir;
-
-include "path.m";
-
-repopath: string;
-
-init(arg: string)
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	gwd = load Workdir Workdir->PATH;
-	readdir = load Readdir Readdir->PATH;
-
-	repopath = makepathabsolute(arg);
+	mods = m;
 }
 
 makepathabsolute(path: string): string

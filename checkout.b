@@ -1,76 +1,23 @@
 implement Checkoutmod;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+mods: Mods;
+include "modules.m";
+
 sprint: import sys;	
-
-include "bufio.m";
-Iobuf: import Bufio;
-
-include "daytime.m";
-
-include "draw.m";
-
-include "string.m";
-	stringmod: String;
-
-include "tables.m";
-	tables: Tables;
-Table, Strhash: import tables;
-
-include "commit.m";
-	commitmod: Commitmod;
 readcommit: import commitmod;	
-
-include "fs.m";
-Shaobject: import Fs;
-
-include "gitindex.m";
-	gitindex: Gitindex;
+Shaobject: import Gitfs;
 Entry, Index: import gitindex;
-
-include "tree.m";
-	treemod: Treemod;
 readtree: import treemod;	
-
-include "path.m";
-	pathmod: Pathmod;
 dirname, makeabsentdirs, string2path: import pathmod;	
-
-include "utils.m";
-	utils: Utils;
 cutprefix, error, isunixdir, readsha1file, sha2string, string2sha: import utils;	
 
-include "checkout.m";
+commit: string;
 
-shatable: ref Strhash[ref Shaobject];
-commit, mntpt, repopath: string;
-index: ref Index;	
-
-init(arglist: list of string, debug: int, ind: Index, shat: ref Strhash[ref Shaobject])
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	stringmod = load String String->PATH;
-	tables = load Tables Tables->PATH;
-
-	commitmod = load Commitmod Commitmod->PATH;
-	gitindex = load Gitindex Gitindex->PATH;
-	pathmod = load Pathmod Pathmod->PATH;
-	treemod = load Treemod Treemod->PATH;
-	utils = load Utils Utils->PATH;
-
-	commitmod->init(arglist, debug);
-	index = Index.new(arglist, debug);
-	*index.header = *ind.header;
-	index.header.entriescnt = 0;
-	pathmod->init(repopath);
-	treemod->init(arglist, debug);
-	utils->init(arglist, debug);
-
-	repopath = hd arglist;
-	arglist = tl arglist;
-	mntpt = hd arglist; 
-	shatable = shat;
+	mods = m;
 }
 
 checkout(sha1: string): ref Index
@@ -129,7 +76,3 @@ checkoutblob(path, sha1: string)
 	dirstat.qid = shaobject.dirstat.qid;
 	shaobject.dirstat = ref dirstat;
 }
-
-
-
-

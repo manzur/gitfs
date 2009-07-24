@@ -2,5 +2,6 @@
 Log: module
 {
 	PATH: con "/dis/git/log.dis";
-	init: fn(arglist: list of string, ch: chan of array of byte, debug: int);
+	init: fn(mods: Mods);
+	readlog: fn(sha1: string, ch: chan of array of byte);
 };

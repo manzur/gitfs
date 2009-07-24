@@ -1,63 +1,29 @@
 implement Log;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
+
 sprint: import sys;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;	
-
-include "daytime.m";
-	daytime: Daytime;
 gmt, Tm: import daytime;
-
-include "draw.m";	
-
-include "lists.m";
-	lists: Lists;
-
-include "string.m";
-	stringmod: String;
 splitl, splitr: import stringmod;	
-
-include "tables.m";
-Strhash: import Tables;
-
-include "utils.m";
-	utils: Utils;
 debugmsg, error, readsha1file: import utils;	
-
-include "commit.m";
-	commitmod: Commitmod;
 readcommit, Commit: import commitmod;
-
-include "log.m";
 
 stderr: ref Sys->FD;	
 msgchan: chan of array of byte;	
-repopath: string;
 commits: list of ref Commit;	
+mods: Mods;	
 	
-init(arglist: list of string, ch: chan of array of byte, debug: int)
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	bufio = load Bufio Bufio->PATH;
-	daytime = load Daytime Daytime->PATH;
-	lists = load Lists Lists->PATH;
-	stringmod = load String String->PATH;
+	mods = m;
+}
 
-	commitmod = load Commitmod Commitmod->PATH;
-	utils = load Utils Utils->PATH;
-	commitmod->init(arglist, debug);
-	utils->init(arglist, debug);
-
-	repopath = hd arglist; 
-	arglist = tl arglist;
-
+readlog(sha1: string, ch: chan of array of byte)
+{
 	msgchan = ch;
-	commit := readcommit(hd tl arglist);
-
+	commit := readcommit(sha1);
 	showlog(commit);
 }
 
@@ -123,10 +89,6 @@ showlog(commit: ref Commit)
 	}
 	msgchan <-= nil;
 }
-
-
-
-
 
 usage()
 {

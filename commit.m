@@ -13,7 +13,7 @@ Commitmod: module{
 		comment: string;
 	};
 
-	init: fn(arglist: list of string, debug: int);
+	init: fn(mods: Mods);
 	readcommit: fn(sha1: string): ref Commit;
 	readcommitbuf: fn(sha1: string, buf: array of byte): ref Commit;
 };

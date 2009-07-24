@@ -16,7 +16,7 @@ Utils: module
 		attr, val: string;
 	};
 
-	init:          fn(arglist: list of string, debug: int);
+	init:          fn(mods: Mods);
 	
 	writesha1file: fn(ch: chan of (int, array of byte));
 	readsha1file:  fn(path: string): (string, int, array of byte);
@@ -53,7 +53,7 @@ Utils: module
 	chomp:         fn(s: string): string;
 	splitl:        fn(s: string, sep: string, count: int): (string, string);
 
-	readline:      fn(ibuf: ref Iobuf): string;
+	readline:      fn(ibuf: ref Bufio->Iobuf): string;
 
 	isunixdir:         fn(mode: int): int;
 	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 

@@ -9,6 +9,7 @@ Repo: module
 	NAMEOFFSET: con 62;
 	NAMEOFFSETEX: con 64;
 
-	readrepo: fn(arglist: list of string, debug: int): int;
+	init: fn(mods: Mods);
+	readrepo: fn(): int;
 };
 

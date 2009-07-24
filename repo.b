@@ -1,39 +1,25 @@
 implement Repo;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
+
 sprint: import sys;
-
-include "draw.m";
-
-include "bufio.m";
-Iobuf: import Bufio;
-
-include "readdir.m";
-	readdir: Readdir;
-
-include "tables.m";
-Strhash: import Tables;
-
-include "utils.m";
-	utils: Utils;
 comparebytes, debugmsg, error, int2bytes, packqid, readint, readshort, INTSZ, QIDSZ, SHALEN: import utils;	
 
-include "repo.m";
+mods: Mods;
+indexpath, gitfsindexpath: string;
 
-repopath, indexpath, gitfsindexpath: string;
-
-readrepo(arglist: list of string, debug: int): int
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	readdir = load Readdir Readdir->PATH;
-	utils = load Utils Utils->PATH;
-	
-	utils->init(arglist, debug);
-	repopath = hd arglist;
+	mods = m;
+	sys->print("repopath is %s\n", repopath);
 	indexpath = repopath + ".git/index";
 	gitfsindexpath = repopath + ".git/gitfsindex";
+}
 
+readrepo(): int
+{
 	return checkrepo() && convertindex();
 }
 

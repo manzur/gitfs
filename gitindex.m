@@ -46,7 +46,7 @@ Gitindex : module
 	Index: adt
 	{
 		header:     ref Header;
-		entries:    ref Strhash[ref Entry]; 	
+		entries:    ref Tables->Strhash[ref Entry]; 	
 		hashcap:    int;
 		addfile:    fn(index: self ref Index, path: string): string;
 		addentry:   fn(index: self ref Index, entry: ref Entry);
@@ -56,6 +56,7 @@ Gitindex : module
 		new:        fn(arglist: list of string, debug: int): ref Index;
 	};
 	
+	init: fn(mods: Mods);
 	readindex:  fn(index:ref Index): int;
 	writeindex: fn(index:ref Index): int;
 };

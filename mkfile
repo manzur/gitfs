@@ -13,6 +13,7 @@ TARG=\
 #	init.dis\
 	log.dis\
 	gitfs.dis\
+	mods.dis\
 	read-tree.dis\
 	checkout.dis\
 #	show-diff.dis\
@@ -30,6 +31,8 @@ MODULES=\
 	cat-file.m\
 #	exclude.m\
 	checkout.m\
+	modules.m\
+	mods.m\
 	commit.m\
 	read-tree.m\
 	gitindex.m\

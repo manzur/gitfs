@@ -1,60 +1,22 @@
 implement Committree;
 
-include "sys.m";
-	sys: Sys;
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
+
 sprint: import sys;
-
-include "filter.m";
-	deflate: Filter;
-		
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;
-
-include "path.m";
-	pathmod: Pathmod;
-
-include "utils.m";
-	utils: Utils;
 error, int2string, readline, sha2string: import utils;
-
-
-include "daytime.m";
-	daytime: Daytime;
-
-include "env.m";
-	env: Env;
-
-include "commit-tree.m";
 
 MAXUSERLEN: con 128;
 
 stderr: ref Sys->FD;
-repopath: string;
+mods: Mods;
 
-
-init(arglist: list of string, debug: int)
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-
-	bufio = load Bufio Bufio->PATH;
-	daytime = load Daytime Daytime->PATH;
-	deflate = load Filter Filter->DEFLATEPATH;
-	env = load Env Env->PATH;
-
-	pathmod = load Pathmod Pathmod->PATH;
-	utils = load Utils Utils->PATH;
-
-	stderr = sys->fildes(2);
-
-	deflate->init();
-
-	repopath = hd arglist;
-	utils->init(arglist, debug);
-	pathmod->init(repopath);
-
+	mods = m;
+	deflatefilter->init();
 	parents: list of string = nil;
-
 }
 
 #returns sha1 of the new commit

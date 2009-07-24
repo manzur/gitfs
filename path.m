@@ -9,7 +9,7 @@ Pathmod: module
 	INDEXLOCKPATH: con ".git/index.lock";
 	OBJECTSTOREPATH: con ".git/objects";
 	
-	init: fn(path: string);
+	init: fn(mods: Mods);
 	basename: fn(path: string): (string, string);
 	cleandir: fn(path: string);
 	dirname: fn(path: string): string;

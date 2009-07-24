@@ -1,77 +1,32 @@
 implement Utils;
 
-include "utils.m";
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
 
-include "sys.m";
-	sys: Sys;
 sprint: import sys;
-
-
-include "draw.m";
-
-include "keyring.m";
-	keyring: Keyring;
-		
-include "filter.m";
-	inflate: Filter;
-	deflate: Filter;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;
-
-include "readdir.m";
-	readdir: Readdir;
-
-include "string.m";
-	stringmod: String;
-
-include "tables.m";
-	tables: Tables;	
-Strhash: import tables;
-
-include "workdir.m";
-	gwd: Workdir;
-
-include "path.m";
-	pathmod: Pathmod;
 cleandir, dirname, makeabsentdirs, makepathabsolute, string2path: import pathmod;	
-
-
-repopath: string;
 
 hex := array[16] of {"0","1","2", "3", "4", "5", "6", "7", "8", "9",
 			"a","b","c", "d", "e", "f"};
 
 stderr: ref Sys->FD;
 
-init(arglist: list of string, deb: int)
+mods: Mods;
+
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;
-	keyring = load Keyring Keyring->PATH;
-	inflate = load Filter Filter->INFLATEPATH;
-	deflate = load Filter Filter->DEFLATEPATH;
-	bufio   = load Bufio Bufio->PATH;
-	gwd     = load Workdir Workdir->PATH;
-	readdir = load Readdir Readdir->PATH;
-	stringmod = load String String->PATH;
-	tables = load Tables Tables->PATH;
-
-	repopath = hd arglist;
-
-	pathmod = load Pathmod Pathmod->PATH;
-	pathmod->init(repopath);
-	inflate->init();
-	deflate->init();
+	mods = m;
+	inflatefilter->init();
+	deflatefilter->init();
 	stderr = sys->fildes(2);
-	debug = deb;
 }
 
 writesha1file(ch: chan of (int, array of byte))
 {
 
 #FIXME: make deflate level more configurable
-	rqchan := deflate->start("z1");
+	rqchan := deflatefilter->start("z1");
 	old := array[0] of byte;
 	buf: array of byte;
 	sz := 0;
@@ -118,7 +73,7 @@ readsha1file(shafilename: string): (string, int, array of byte)
 		return ("", 0, nil);
 	}
 	debugmsg("after if\n");
-	rqchan := inflate->start("z");
+	rqchan := inflatefilter->start("z");
 	old := array[0] of byte;
 
 mainloop:

@@ -1,52 +1,18 @@
 implement Readtree;
 
-include "read-tree.m";
+include "gitfs.m";
+include "mods.m";
+include "modules.m";
 
-include "sys.m";
-	sys: Sys;
-
-include "draw.m";
-
-include "tables.m";
-	tables: Tables;
-Strhash: import Tables;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;
-
-include "utils.m";
-	utils: Utils;
 error, readsha1file, sha2string, SHALEN: import utils;
-
-
-include "gitindex.m";
-	gitindex: Gitindex;
 Index, Entry: import gitindex;	
+splitl: import stringmod;	
 
-include "string.m";
-	stringmodule: String;
-splitl: import stringmodule;	
+mods: Mods;
 
-index: ref Index;
-
-repopath: string;
-
-debug: int;
-
-init(arglist: list of string, deb: int)
+init(m: Mods)
 {
-	sys = load Sys Sys->PATH;	
-	utils = load Utils Utils->PATH;
-	bufio = load Bufio Bufio->PATH;
-	gitindex = load Gitindex Gitindex->PATH;
-	tables = load Tables Tables->PATH;
-	stringmodule = load String String->PATH;
-
-	repopath = hd arglist;
-	debug = deb;
-	utils->init(arglist, debug);
-
+	mods = m;
 }
 
 readtree(path: string)
@@ -64,7 +30,7 @@ readtreefile(path: string, basename: string)
 	while((s := ibuf.gets('\0')) != ""){
 		(modestr, filepath) := splitl(s, " ");
 		sys->print("==>filepath %s\n", filepath);
-		mode := stringmodule->toint(modestr,10).t0;
+		mode := stringmod->toint(modestr,10).t0;
 		if(isdir(mode)){
 			sha1 := array[SHALEN] of byte;
 			ibuf.read(sha1, SHALEN);

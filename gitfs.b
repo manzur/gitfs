@@ -1,80 +1,18 @@
 implement Gitfs;
 
-include "sys.m";
-	sys: Sys;
+include "mods.m";
+mods: Mods;
+include "modules.m";
+
 print, sprint: import sys;
-
-include "bufio.m";
-	bufio: Bufio;
-Iobuf: import bufio;	
-
-include "daytime.m";
-	daytime: Daytime;
-
-include "draw.m";	
-
-include "readdir.m";
-	readdir: Readdir;
-
-include "lists.m";
-	lists: Lists;
-
-include "tables.m";
-	tables: Tables;
-Table, Strhash: import tables;	
-
-include "string.m";
-	stringmod: String;
-
-include "styx.m";	
-	styx: Styx;
 Tmsg, Rmsg: import styx;
-
-include "styxservers.m";
-	styxservers: Styxservers;
 Fid, Navop, Navigator, Styxserver: import styxservers;
-
-include "cat-file.m";
-	catfile: Catfile;
-
-include "checkout.m";
-	checkoutmod: Checkoutmod;
-
-include "commit.m";
-	commitmod: Commitmod;
 readcommitbuf, Commit: import commitmod;
-
-include "commit-tree.m";
-	committree: Committree;
-
-include "gitindex.m";
-	gitindex: Gitindex;
 readindex, writeindex, Entry, Header, Index: import gitindex;
-
-include "log.m";
-	log: Log;
-
-include "repo.m";
-	repo: Repo;
-
-include "tree.m";
-	treemod: Treemod;
 readtreebuf, Tree: import treemod;
-
-include "path.m";
-	pathmod: Pathmod;
 basename, cleandir, makeabsentdirs, makepathabsolute, string2path, INDEXPATH, HEADSPATH, OBJECTSTOREPATH: import pathmod;	
-
-include "read-tree.m";	
-	readtreemod: Readtree;
 readtree: import readtreemod;	
-
-include "utils.m";
-	utils: Utils;
 bufsha1, debugmsg, error, sha2string, splitl, SHALEN: import utils;
-
-include "write-tree.m";
-	writetreemod: Writetree;
 writetree: import writetreemod;	
 
 include "gitfs.m";
@@ -90,14 +28,10 @@ arglist: list of string;
 commitmsg: array of byte;
 debug: int;
 heads: list of ref Head;
-index: ref Index;	
-mntpt: string = "/usr/manzur/gitfs/mnt/";
 nav: ref Navigator;
 readqueries: ref Table[list of Readquery];
 srv: ref Styxserver;
-repopath: string;
 rootfid: int;
-shatable: ref Strhash[ref Shaobject];
 table: ref Strhash[ref Direntry];
 workingdir: ref Direntry;
 
@@ -105,33 +39,11 @@ cwd, ppwd: big;
 
 init(nil: ref Draw->Context, args: list of string)
 {
-	sys = load Sys Sys->PATH;
+	mods = load Mods Mods->PATH;
 
-	bufio = load Bufio Bufio->PATH;
-	daytime = load Daytime Daytime->PATH;
-	lists = load Lists Lists->PATH;
-	readdir = load Readdir Readdir->PATH;
-	stringmod = load String String->PATH;
-	tables = load Tables Tables->PATH;
-	styx = load Styx Styx->PATH;
-	styxservers = load Styxservers Styxservers->PATH;
-
-	catfile = load Catfile Catfile->PATH;
-	checkoutmod = load Checkoutmod Checkoutmod->PATH;
-	commitmod = load Commitmod Commitmod->PATH;
-	committree = load Committree Committree->PATH;
-	gitindex = load Gitindex Gitindex->PATH;
-	log = load Log Log->PATH;
-	pathmod = load Pathmod Pathmod->PATH;
-	repo = load Repo Repo->PATH;
-	readtreemod = load Readtree Readtree->PATH;
-	treemod = load Treemod Treemod->PATH;
-	utils = load Utils Utils->PATH;
-	writetreemod = load Writetree Writetree->PATH;
-
-	if(len args < 2)
-		usage();
-	
+#	if(len args < 2)
+#		usage();
+#	
 	arg := hd (tl args);
 
 	if(len args == 3 && arg == "-d"){
@@ -139,18 +51,10 @@ init(nil: ref Draw->Context, args: list of string)
 		arg = hd (tl (tl args));
 	}
 
-	pathmod->init(arg);
-	repopath = makepathabsolute(arg);
-	arglist = repopath :: (mntpt :: nil);
-
-	commitmod->init(arglist, debug);
-	committree->init(arglist, debug);
-	readtreemod->init(arglist, debug);
-	treemod->init(arglist, debug);
-	utils->init(arglist, debug);
-	writetreemod->init(arglist, debug);
+	mods->init(arg, debug);
+	initmodules();
 	
-	if(!repo->readrepo(arglist, debug)){
+	if(!repo->readrepo()){
 		error("repository is wrong\n");
 		exit;
 	}
@@ -160,7 +64,7 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->pctl(Sys->NEWPGRP, nil);
 	inittable();
 
-	checkoutmod->init(arglist, debug, *index, shatable);
+	checkoutmod->init(mods);
 
 	styx->init();
 	styxservers->init(styx);
@@ -171,6 +75,22 @@ init(nil: ref Draw->Context, args: list of string)
 	tmsgchan: chan of ref Tmsg;
 	(tmsgchan, srv) = Styxserver.new(sys->fildes(0), nav, big QRoot);
 	spawn process(srv, tmsgchan);
+}
+
+initmodules()
+{
+	catfilemod->init(mods);
+	checkoutmod->init(mods);
+	commitmod->init(mods);
+	committree->init(mods);
+	gitindex->init(mods);
+	log->init(mods);
+	pathmod->init(mods);
+	repo->init(mods);
+	treemod->init(mods);
+	readtreemod->init(mods);
+	utils->init(mods);
+	writetreemod->init(mods);
 }
 
 
@@ -472,7 +392,7 @@ mainloop:
 					logch := chan of array of byte;
 					head := direntry.object.sha1; 
 
-					spawn log->init(lists->append(arglist, head), logch, debug);
+					spawn log->readlog(head, logch);
 
 					offset := m.offset;
 					temp: array of byte;
@@ -539,7 +459,7 @@ mainloop:
 					path := direntry.object.sha1;
 					catch := chan of array of byte;
 					
-					spawn catfile->init(lists->append(arglist, path), catch, debug);
+					spawn catfilemod->catfile(path, catch);
 
 					#reading filetype
 					#<-catch;
@@ -1084,6 +1004,5 @@ Direntry.getdirstat(direntry: self ref Direntry): ref Sys->Dir
 
 	return ref ret;
 }
-
 
 
