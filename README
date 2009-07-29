@@ -3,11 +3,116 @@ Table of Contents:
 
 1) Installation
 2) File system hierarchy
-3) Examples
+3) Internals
+4) Examples
 ----------------------------------------------
 
 1) Installation
 
-	To install gitfs you need inferno and mk tools.
-	 
+	To install gitfs you need Inferno OS and mk tools.
+	Installation is done by executing:
+		mk install
+
+	This commands compiles all the source code, and
+	copies compiled units to /dis/git.
+	
+2) File system hierarchy
+	
+	/ - root directory
+	/index - index file's mapped to this dir. 
+		 Dir contains files at stage 0.
+		
+	/index/1 - files located at stage 1.
+	/index/2 - files located at stage 2.
+	/index/3 - files located at stage 3.
+
+	/<branchname> - <branchname> is extracted from .git/refs/heads, 
+			slashes in the path're replaced to '+'.
+	
+	/<branchname>/commit_msg - contains commit message of the current commit.
+	/<branchname>/log - log beginning from the current commit
+	/<branchname>/parent[1..N] - parents of the current commit. Each parent has the same 
+				     directory layout.
+	/<branchname>/tree - snapshot of the working tree for the current commit
+
+
+3) Internals
+	As git index format has strong binding with Unix-like systems, it was decided to
+	use Gitfs's own index format that reflects Inferno OS. Gitfs creates gitindex 
+	under .git/ dir, which's some kind of mapping of the current index.
+	Caution: working dir should correspondent to git's index to build gitfsindex.  
+	
+	Of course after working with gitfs you should convert gitfsindex to git index. 
+	To do that you should use tranlator.c, which converts all gitfs index entries to git's.
+	You wonder if it wasn't possible to use git's index and work with that? It's not
+	possible, because at least we don't know ino of the new index entry(I agree that 'os' command
+	could be used for that purpose, but it elimanates Inferno's portbality principle).
+
+	Each time git's index is modified gitfs's also modified. This modification's done 
+	automatically after you mount the fs. Index modification is checked by
+	comparing old and new sha1 of the index.
+
+		
+4) Examples
+	
+	Mounting
+		
+		mount {gitfs <pathtorepo>} <mntpt>
+		
+		<pathtorepo> - is absolute or relative path to the repository, i.e. dir 
+		which contains '.git' as a subdir	
+	
+		<mntpt> - is directory where filesystem is mounted
+
+	Listing files under index
+		
+		Instead of commonly used git-ls-files, you can simply list
+		the index directory:
+
+			ls -l index/
+
+	Listing branch names
+		
+		git branch can be done by listing root of the files system
+			ls <mntpt>
+
+
+	Vieving log of the head
+		
+		cat <branchname>/log
+
+	Checking out some commit
+
+		Before checking out you should find the apropriate commit by 
+		traversing the files system beginning from some branch. 
+		After you find it, you can simply enter	tree/ subdir of that commit. 
+		Viewing files under tree/ doesn't imply	checking out. 
+		But if you create, remove or write to some file, commit 
+		is checked out to the working tree of <pathtorepo>, and all 
+		subsequent operations are done by executing on that files.
+
+	Adding files to index
+		
+		Files that're checked out can be add to the index by just copying
+		the file to /index dir. If you're located far from the index dir
+		you can(located in working tree/):
+			mkdir index
+			bind <pathtoindex> 'index'
+
+		After that you should be able to copy files to the binded dir. 
+		That's much more convenient than pointing path to index/ every time.
+		
+	
+	Committting
+		
+		Committing is done in commit directory. Commig msg 
+		is written to commit_msg. However, reading the file 
+		gives old commit message. For example,
+			
+			echo my commit msg > commit_msg
+			mv tree commit
+	
+		The last command commits the tree/ and update the the branch,
+		so that you're located in the new commit directory.
+
 
