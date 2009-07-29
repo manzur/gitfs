@@ -7,7 +7,7 @@ include "modules.m";
 sprint: import sys;
 gmt, Tm: import daytime;
 splitl, splitr: import stringmod;	
-debugmsg, error, readsha1file: import utils;	
+readsha1file: import utils;	
 readcommit, Commit: import commitmod;
 
 stderr: ref Sys->FD;	
@@ -54,6 +54,25 @@ printlist(l: list of ref Commit)
 	sys->print("\n");
 }
 
+toint(b: int): int
+{
+	sys->print("toprint(): %c==%d\n", b, b - '0');
+	return b - '0';
+}
+
+dateformatconv(s: string): string
+{
+	(s1, s2) := stringmod->splitl(s, ">");
+	s2 = s2[1:];
+	(time, off) := stringmod->toint(s2, 10);
+	sys->print("BB=>%d\n", time);
+	sys->print("AA===>%s\n", off);
+	off = off[1:];
+	date := daytime->text(daytime->local(time));
+
+	return s1 + "> " + date + " " + off;
+}
+
 getcommits(parents: list of ref Commit)
 {
 	if(parents == nil)
@@ -81,8 +100,8 @@ showlog(commit: ref Commit)
 	while(commits != nil){
 		commit = hd commits;
 		msgchan <-= sys->aprint("Commit: %s\n", commit.sha1);
-		msgchan <-= sys->aprint("%s\n", commit.author);
-	        msgchan <-= sys->aprint("%s\n", commit.committer);
+		msgchan <-= sys->aprint("%s\n", dateformatconv(commit.author));
+	        msgchan <-= sys->aprint("%s\n", dateformatconv(commit.committer));
 	        msgchan <-= sys->aprint("%s\n\n", commit.comment);
 
 		commits = tl commits;

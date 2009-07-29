@@ -6,7 +6,7 @@ include "modules.m";
 
 sprint: import sys;
 Index, Entry: import gitindex;
-bufsha1, sha2string, SHALEN: import utils;
+bufsha1, mergesort, sha2string, SHALEN: import utils;
 
 mods: Mods;
 init(m: Mods)
@@ -85,79 +85,3 @@ writetreefile(entrylist: list of ref Entry, basename: string): (array of byte, l
 	sys->print("tree is written to %s\n", sha2string(sha));
 	return (sha, entrylist);
 }
-
-mergesort(l: list of ref Entry): list of ref Entry
-{
-	if(len l > 1)
-	{
-		middle := len l / 2;
-		(l1, l2) := partitionbypos(l, middle);
-		l1 = mergesort(l1);
-		l2 = mergesort(l2);
-		return merge(l1, l2);
-	}
-	return l;
-}
-
-merge(l1, l2: list of ref Entry): list of ref Entry
-{
-	if(l1 == nil)
-		return l2;
-	if(l2 == nil)
-		return l1;
-	
-	l: list of ref Entry = nil;
-	while(l1 != nil && l2 != nil)
-	{
-		if((hd l1).compare(hd l2) == 1)
-		{
-			l = hd l1 :: l;
-			l1 = tl l1;
-			continue;
-		}
-		l = hd l2 :: l;
-		l2 = tl l2;
-	}
-
-	while(l1 != nil)
-	{
-		l = hd l1 :: l;
-		l1 = tl l1;
-	}
-
-	while(l2 != nil)
-	{
-		l = hd l2 :: l;
-		l2 = tl l2;
-	}
-
-	l = reverse(l);
-	return l;
-}
-
-partitionbypos(l: list of ref Entry, pos: int): (list of ref Entry, list of ref Entry)
-{
-	if(len l < pos)
-		return (l, nil);
-	l1 : list of ref Entry = nil;
-	for(i := 0; i < pos; i++)
-	{
-		l1 = hd l :: l1;
-		l = tl l;
-	}
-	return (reverse(l1), l);
-}
-
-
-
-reverse(l: list of ref Entry): list of ref Entry
-{
-	l1: list of ref Entry = nil;
-	while(l != nil)
-	{
-		l1 = hd l :: l1;
-		l = tl l;
-	}
-	return l1;
-}
-

@@ -24,12 +24,14 @@ Utils: module
 	filesha1:      fn (path: string): array of byte;
 	bufsha1:       fn(buf: array of byte): array of byte;
 	
+	onlyspace:     fn(s: string): int;
 	int2string:    fn(num: int): string;
 
 	save2file:     fn(path: string, buf: array of byte): int;
 	sha2string:    fn(sha: array of byte): string;
 	string2sha:    fn(sha1: string): array of byte;
 
+	mergesort:     fn(l: list of ref Gitindex->Entry): list of ref Gitindex->Entry;
 	comparebytes:  fn(a, b: array of byte): int;
 	bytes2int:     fn(buf: array of byte, offset: int): int;
 	bytes2big:     fn(buf: array of byte, offset: int): big;
@@ -50,10 +52,12 @@ Utils: module
 	equalshas:     fn(sha1, sha2: array of byte): int;
 
 	ltrim:         fn(s: string): string;
-	chomp:         fn(s: string): string;
+	trim:	       fn(s: string): string;
+	strip:         fn(s: string): string;
 	splitl:        fn(s: string, sep: string, count: int): (string, string);
 
 	readline:      fn(ibuf: ref Bufio->Iobuf): string;
+	getline:       fn(fd: ref Sys->FD): string;
 
 	isunixdir:         fn(mode: int): int;
 	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 

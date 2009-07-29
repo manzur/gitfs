@@ -9,7 +9,7 @@ sprint: import sys;
 dirname, makeabsentdirs: import pathmod;	
 
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-debugmsg, error, bytes2int, bytes2big, big2bytes, comparebytes,int2bytes, filesha1, allocnr, packqid, sha2string, unpackqid, equalshas: import utils;
+bytes2int, bytes2big, big2bytes, comparebytes, debugmsg, error, int2bytes, filesha1, allocnr, mergesort, packqid, sha2string, unpackqid, equalshas: import utils;
 
 filebuf: array of byte;
 
@@ -313,15 +313,24 @@ writeindexto(index:ref Index, path : string) : int
 	temp = int2bytes(index.header.entriescnt);
 	state = keyring->sha1(temp, len temp, nil, state);
 
+	entries := index.entries.all();
+	index.header.signature = CACHESIGNATURE; 
+	index.header.entriescnt = len entries;
+
 	header := index.header.pack();
+	#FIXME: header entriescnt and len entries.all should equal
 	sys->write(fd, header, len header);
 
+	sys->print("writeindex: hentriescnt is: %d\n", index.header.entriescnt);
+	sys->print("writeindex: entriescnt  is: %d\n", len index.entries.all());
+	sys->print("writeindex: entriescnt  is: %x\n", index.header.signature);
 	cnt := 0;
 	entrybuf: array of byte;
-	for(l := index.entries.all(); l != nil; l = tl l)
+	for(l := mergesort(entries); l != nil; l = tl l)
 	{
 		entrybuf = (hd l).pack();
 		cnt := sys->write(fd, entrybuf, len entrybuf);
+		sys->print("entry: %s %s\n", (hd l).name, sha2string((hd l).sha1));
 		if(cnt != len entrybuf){
 			error(sprint("couldn't write entry to the file: %r\n"));
 			return cnt;

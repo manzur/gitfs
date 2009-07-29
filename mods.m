@@ -23,6 +23,7 @@ Mods: module
 	checkoutmod: Checkoutmod;
 	commitmod: Commitmod;
 	committree: Committree;
+	configmod: Configmod;
 	gitindex: Gitindex;
 	log: Log;
 	pathmod: Pathmod;

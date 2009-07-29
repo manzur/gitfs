@@ -14,6 +14,7 @@ TARG=\
 	log.dis\
 	gitfs.dis\
 	mods.dis\
+	config.dis\
 	read-tree.dis\
 	checkout.dis\
 #	show-diff.dis\
@@ -31,6 +32,7 @@ MODULES=\
 	cat-file.m\
 #	exclude.m\
 	checkout.m\
+	config.m\
 	modules.m\
 	mods.m\
 	commit.m\

@@ -4,6 +4,7 @@ include "gitfs.m";
 include "mods.m";
 include "modules.m";
 
+Index, Entry: import gitindex;
 sprint: import sys;
 cleandir, dirname, makeabsentdirs, makepathabsolute, string2path: import pathmod;	
 
@@ -149,7 +150,97 @@ bufsha1(buf: array of byte): array of byte
 }
 
 
+trim(s: string): string
+{
+	for(i := 0; i < len s && (s[i] == ' ' || s[i] == '\t'); i++);
+	for(j := len s; j > 0 && (s[j-1] == ' ' || s[j-1] == '\t'); j--);
+	if(j < i)
+		j = i;
+	return s[i:j];
+}
 
+onlyspace(s: string): int
+{
+	if(s == nil) return 0;
+	for(i := 0; i < len s; i++){
+		if(s[i] != ' ' || s[i] != '\t')
+			return 0; 
+	}
+	return 0;
+}
+
+mergesort(l: list of ref Entry): list of ref Entry
+{
+	if(len l > 1)
+	{
+		middle := len l / 2;
+		(l1, l2) := partitionbypos(l, middle);
+		l1 = mergesort(l1);
+		l2 = mergesort(l2);
+		return merge(l1, l2);
+	}
+	return l;
+}
+
+merge(l1, l2: list of ref Entry): list of ref Entry
+{
+	if(l1 == nil)
+		return l2;
+	if(l2 == nil)
+		return l1;
+	
+	l: list of ref Entry = nil;
+	while(l1 != nil && l2 != nil)
+	{
+		if((hd l1).compare(hd l2) == 1)
+		{
+			l = hd l1 :: l;
+			l1 = tl l1;
+			continue;
+		}
+		l = hd l2 :: l;
+		l2 = tl l2;
+	}
+
+	while(l1 != nil)
+	{
+		l = hd l1 :: l;
+		l1 = tl l1;
+	}
+
+	while(l2 != nil)
+	{
+		l = hd l2 :: l;
+		l2 = tl l2;
+	}
+
+	l = reverse(l);
+	return l;
+}
+
+partitionbypos(l: list of ref Entry, pos: int): (list of ref Entry, list of ref Entry)
+{
+	if(len l < pos)
+		return (l, nil);
+	l1 : list of ref Entry = nil;
+	for(i := 0; i < pos; i++)
+	{
+		l1 = hd l :: l1;
+		l = tl l;
+	}
+	return (reverse(l1), l);
+}
+
+reverse(l: list of ref Entry): list of ref Entry
+{
+	l1: list of ref Entry = nil;
+	while(l != nil)
+	{
+		l1 = hd l :: l1;
+		l = tl l;
+	}
+	return l1;
+}
 
 filesha1(filename: string): array of byte
 {
@@ -286,7 +377,7 @@ getuserinfo(): ref Strhash[ref Config]
 	{
 		if(iswhitespace(s))
 			return nil;
-		s = chomp(s);
+		s = strip(s);
 		(s1, s2) := stringmod->splitl(s, "=");
 		s2 = s2[1:];
 		config.add(s1, ref Config(s1, s2));
@@ -299,10 +390,11 @@ iswhitespace(s: string): int
 	return s == "\n" || s == "\t" || s == " ";
 }
 
-chomp(s: string): string
+strip(s: string): string
 {
-	if(len s == 0) return s;
-	return s[:len s - 1];
+	if(s != nil && s[len s-1] == '\n')
+		return s[:len s - 1];
+	return s;
 }
 
 readline(ibuf: ref Iobuf): string
@@ -318,6 +410,26 @@ readline(ibuf: ref Iobuf): string
 	}
 	return ret;
 }
+
+getline(fd: ref Sys->FD): string
+{
+	s: string;
+	cnt: int;
+	buf := array[1] of byte;
+	while(1){
+		cnt = sys->read(fd, buf, len buf);
+		if(cnt <= 0 || buf[0] == byte '\n')
+			break;
+		s += string buf;
+	}
+
+	if(cnt <= 0)
+		return nil;
+
+	s[len s] = '\n';
+	return s;
+}
+
 
 equalshas(sha1, sha2: array of byte): int
 {

@@ -27,6 +27,7 @@ include "cat-file.m";
 include "checkout.m";
 include "commit.m";
 include "commit-tree.m";
+include "config.m";
 include "gitfs.m";
 include "gitindex.m";
 include "log.m";
@@ -66,6 +67,7 @@ init(path: string, deb: int)
 	checkoutmod = load Checkoutmod Checkoutmod->PATH;
 	commitmod = load Commitmod Commitmod->PATH;
 	committree = load Committree Committree->PATH;
+	configmod = load Configmod Configmod->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	log = load Log Log->PATH;
 	pathmod = load Pathmod Pathmod->PATH;

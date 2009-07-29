@@ -25,7 +25,7 @@ include "cat-file.m";
 include "checkout.m";
 include "commit.m";
 include "commit-tree.m";
-#include "gitfs.m";
+include "config.m";
 include "gitindex.m";
 include "log.m";
 include "path.m";
@@ -35,6 +35,6 @@ include "read-tree.m";
 include "utils.m";
 include "write-tree.m";
 
-catfilemod, checkoutmod, commitmod, committree, gitindex, log, pathmod, repo, treemod, readtreemod, utils, writetreemod: import mods;
+catfilemod, checkoutmod, commitmod, committree, configmod, gitindex, log, pathmod, repo, treemod, readtreemod, utils, writetreemod: import mods;
 
 index, repopath, shatable: import  mods;

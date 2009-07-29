@@ -90,52 +90,54 @@ commit(treesha: string, parents: list of string, comments: string): string
 }
 
 
+curtime(): string
+{
+	t := daytime->now();
+	off := daytime->local(t).tzoff;
+	sign := '+';
+	if(off < 0){
+		sign = '-';
+	}
+	date := sys->sprint("%d %c%02d%02d", daytime->now(), sign, off / 3600, (off % 3600) / 60); 
+
+	return date;
+}
+
 getcommitterinfo(): string
 {
-	ibuf := bufio->open("/dev/user", Bufio->OREAD);
-	user := ibuf.gets('\0');
-	ibuf = bufio->open("/dev/sysname", Bufio->OREAD);
-	hostname := ibuf.gets('\0');
-	mail := user + "@" + hostname;
+	name := configmod->getstring("user.name");
+	mail := configmod->getstring("user.email");
+	s: string;
+	if((s = env->getenv("GIT_COMMITTER_NAME")) != nil){
+		sys->print("COMNAME: %s\n", s);
+		name = utils->strip(s);
+	}
+	if((s = env->getenv("GIT_COMMITTER_MAIL")) != nil){
+		mail = utils->strip(s);
+	}
 
-	date := daytime->time(); 
-	info := "committer " + user + " <" + mail+ "> " + date + "\n\n";
+	if(name == nil){
+		name = configmod->getstring("committername"); 
+	}
+	if(mail == nil){
+		mail = configmod->getstring("committermail");
+	}
 
+	info := "committer " + name + " <" + mail+ "> " + curtime() + "\n\n";
+
+	sys->print("cominfo==>:%s\n", info);
 	return info;
 }
 
 getauthorinfo(): string
 {
-#FIXME: Code should be changed to get real author's info
-	ibuf := bufio->open("/dev/user", Bufio->OREAD);
-	user := ibuf.gets('\0');
-	ibuf = bufio->open("/dev/sysname", Bufio->OREAD);
-	hostname := ibuf.gets('\0');
-	mail := user + "@" + hostname;
+	name := configmod->getstring("authorname");
+	mail := configmod->getstring("authormail");
 
-	date := daytime->time(); 
-	info := "author " + user + " <" + mail+ "> " + date + "\n";
+	info := "author " + name + " <" + mail+ "> " + curtime() + "\n";
 
 	return info;
 }
-
-
-getpersoninfo(pos: string): (string, string)
-{
-
-	ibuf := bufio->fopen(sys->fildes(0), bufio->OREAD);
-	
-	sys->print("Enter %s's name: ", pos);
-	buf := array[128] of byte;
-	name := readline(ibuf);	
-
-	sys->print("Enter %s's email: ", pos);
-	email := readline(ibuf);
-
-	return (name, email);
-}
-
-
 
 getcomment(): string
 {

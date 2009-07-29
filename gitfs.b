@@ -64,7 +64,8 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->pctl(Sys->NEWPGRP, nil);
 	inittable();
 
-	checkoutmod->init(mods);
+	configmod->readconfig("");
+	sometestfun();
 
 	styx->init();
 	styxservers->init(styx);
@@ -77,12 +78,22 @@ init(nil: ref Draw->Context, args: list of string)
 	spawn process(srv, tmsgchan);
 }
 
+sometestfun()
+{
+	l := configmod->getall();
+	while(l != nil){
+		sys->print("%s==%s\n", (hd l).t0, (hd l).t1);
+		l = tl l;
+	}
+}
+
 initmodules()
 {
 	catfilemod->init(mods);
 	checkoutmod->init(mods);
 	commitmod->init(mods);
 	committree->init(mods);
+	configmod->init(mods);
 	gitindex->init(mods);
 	log->init(mods);
 	pathmod->init(mods);
@@ -597,8 +608,24 @@ mainloop:
 					treesha1 := writetree(index);
 					sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, string commitmsg);
 					sys->print("commited to: %s\n", sha1);
-					commitmsg = nil;
+					#commitmsg = nil;
+					dirstat := sys->stat(pathmod->string2path(sha1)).t1;
+
+					#FIXME: race condition: QMax could change before calling addentry
+					branchname := stringmod->splitl(direntry.getfullpath(), "/").t0;
+					(nil, nil, filebuf) := utils->readsha1file(sha1);
+					#path := addcommitentry(sha1, branchname, QRoot, filebuf); 
+					path := addentry(QRoot, branchname, sha1, makedirstat(QMax, dirstat), "commit");
+					parent.name = "parent11";
+					table.del(string parent.path);
+					table.add(string parent.path, parent);
+					removechild(table.find(string QRoot), parent.path);
+					
+					newentry := table.find(string path);
+					readchildren(sha1, path);
+					updatehead(branchname, sha1);
 					srv.reply(ref Rmsg.Wstat(m.tag));
+					spawn foofayka(repopath + newentry.getfullpath());
 					continue mainloop;
 				}
 
@@ -633,6 +660,20 @@ mainloop:
 	}
 }
 
+updatehead(branch: string, sha1: string)
+{
+	sys->print("branchname: %s\n", branch);
+	fd := sys->open(repopath + ".git/refs/heads/" + branch, Sys->OWRITE);
+	sys->print("==%s\n",repopath + ".git/refs/heads/" + branch);
+	if(fd != nil){
+		sys->print("fd isnt' nil\n");
+		buf := array of byte sha1;
+		cnt := sys->write(fd, buf, len buf);
+		sys->print("cnt is %d: %r\n", cnt);
+	}
+	else sys->print("fd is nill\n");
+}
+
 printlistofstring(l: list of string)
 {
 	sys->print("-------------------\n");
@@ -641,6 +682,13 @@ printlistofstring(l: list of string)
 		l = tl l;
 	}
 	sys->print("-------------------\n");
+}
+
+foofayka(s: string)
+{
+	g := gwd->init();
+	sys->print("foofayka:%s\n", g + "/" + s);
+	sys->chdir(g);
 }
 
 removefile(direntry: ref Direntry)
@@ -741,6 +789,7 @@ mainloop:
 				if(navop.name == ".."){
 					ppath := table.find(string navop.path).parent;
 					direntry := table.find(string ppath);
+					sys->print("par is %bd=%s\n", ppath, direntry.name);
 					navop.reply <-= (direntry.getdirstat(), nil);
 					ppwd = cwd;
 					cwd = ppath;
