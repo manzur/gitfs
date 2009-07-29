@@ -9,7 +9,7 @@ include "filter.m";
 include "keyring.m";
 include "lists.m";
 include "readdir.m";
-include "tables.m";
+include "gittables.m";
 include "string.m";
 include "styx.m";
 include "styxservers.m";

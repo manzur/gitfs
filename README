@@ -1,6 +1,13 @@
-NOTICE:
+----------------------------------------------
+Table of Contents:
 
-- show-diff.b uses ACME SAC's diff
-- I added "all" method to tables.m
+1) Installation
+2) File system hierarchy
+3) Examples
+----------------------------------------------
 
+1) Installation
+
+	To install gitfs you need inferno and mk tools.
+	 
 

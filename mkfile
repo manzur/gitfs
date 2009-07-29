@@ -3,55 +3,42 @@ DISBIN=/dis/git
 
 TARG=\
 	cat-file.dis\
-#	checkout-index.dis\
-#	checkrepo.dis\
 	checkout.dis\
-	commit-tree.dis\
-#	diff-tree.dis\
-#	exclude.dis\
-	gitindex.dis\
-#	init.dis\
-	log.dis\
-	gitfs.dis\
-	mods.dis\
-	config.dis\
-	read-tree.dis\
-	checkout.dis\
-#	show-diff.dis\
-#	indexparser.dis\
-#	update-index.dis\
-	utils.dis\
-	path.dis\
-	repo.dis\
-	tree.dis\
-	read-tree.dis\
 	commit.dis\
+	commit-tree.dis\
+	config.dis\
+	gitfs.dis\
+	gitindex.dis\
+	log.dis\
+	mods.dis\
+	path.dis\
+	read-tree.dis\
+	repo.dis\
+	tables.dis\
+	tree.dis\
+	utils.dis\
 	write-tree.dis
 
 MODULES=\
 	cat-file.m\
-#	exclude.m\
 	checkout.m\
-	config.m\
-	modules.m\
-	mods.m\
 	commit.m\
-	read-tree.m\
+	commit-tree.m\
+	config.m\
 	gitindex.m\
+	gittables.m\
+	log.m\
+	mods.m\
+	modules.m\
+	path.m\
+	read-tree.m\
 	repo.m\
 	tree.m\
-	checkout.m\
-	log.m\
-	commit-tree.m\
-	path.m\
-#	update-index.m\
-	init.m\
-#	indexparser.m\
 	write-tree.m\
 	utils.m
 
 SYSMODULES=\
-	tables.m
+	sys.m
 
 mall:V: all modinstall
 

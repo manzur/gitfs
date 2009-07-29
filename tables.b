@@ -1,5 +1,5 @@
 implement Tables;
-include "tables.m";
+include "gittables.m";
 
 Table[T].new(nslots: int, nilval: T): ref Table[T]
 {

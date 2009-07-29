@@ -14,7 +14,7 @@ include "keyring.m";
 include "lists.m";
 include "readdir.m";
 
-include "tables.m";
+include "gittables.m";
 Table, Strhash: import tables;
 
 include "string.m";
