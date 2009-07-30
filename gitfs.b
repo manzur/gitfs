@@ -62,13 +62,13 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->pctl(Sys->NEWPGRP, nil);
 	inittable();
 
+	
 	configmod->readconfig("");
 
 	styx->init();
 	styxservers->init(styx);
-	if(debug){
-		styxservers->traceset(1);
-	}
+	
+	styxservers->traceset(1);
 	navch := chan of ref Navop;
 	nav = Navigator.new(navch);
 	spawn navigate(navch);
@@ -247,8 +247,21 @@ findchildren(ppath: big): list of ref Direntry
 		return nil;
 
 	if(direntry.object.children == nil && (ppath < QIndex || ppath > QIndex3)){
-		debugmsg(sprint("not filled %bd\n", ppath));
-		readchildren(direntry.object.sha1, ppath);
+		if(direntry.object.otype == "work"){
+			(dirs, nil) := readdir->init(direntry.object.sha1, Readdir->NAME);
+			for(i := 0; i < len dirs; i++){
+				path := QMax++;
+				fullpath := direntry.object.sha1 + "/" + dirs[i].name;
+				dirs[i].qid.path = path;
+				s := ref Shaobject(dirs[i], nil, fullpath, "work", nil); 
+				d := ref Direntry(path, dirs[i].name, s, direntry.path);
+				table.add(string path, d);
+				direntry.object.children = path :: direntry.object.children;
+			}
+		}
+		else{
+			readchildren(direntry.object.sha1, ppath);
+		}
 	}
 
 	children: list of ref Direntry;
@@ -261,7 +274,6 @@ findchildren(ppath: big): list of ref Direntry
 
 		l = tl l;
 	}
-	debugmsg(sprint("returning from findchildren %d; pwd is %bd\n", len children, ppath));
 	return children; 
 }
 
@@ -473,7 +485,7 @@ mainloop:
 					navop.reply <-= (direntry.getdirstat(), nil);
 					continue mainloop;
 				}
-			
+
 				for(l := findchildren(navop.path); l != nil; l = tl l){
 					direntry := hd l;
 					dirstat := direntry.getdirstat();
@@ -513,11 +525,15 @@ mainloop:
 			Stat => 
 				fid := srv.getfid(m.fid); 
 				direntry := table.find(string fid.path);
-				if(direntry == nil || fid.qtype == Sys->QTDIR){
-					srv.stat(m);
-					continue mainloop;
+				if(direntry == nil){
+					srv.reply(ref Rmsg.Stat(m.tag, sys->nulldir));
 				}
-				srv.reply(ref Rmsg.Stat(m.tag, *direntry.getdirstat()));
+				else if(fid.qtype == Sys->QTDIR){
+					srv.stat(m);
+				}
+				else{
+					srv.reply(ref Rmsg.Stat(m.tag, *direntry.getdirstat()));
+				}
 
 			Create =>
 				fid := srv.getfid(m.fid);
@@ -945,7 +961,7 @@ removeentry(path: big)
 	item := table.find(string path);
 	if(item != nil){
 		table.del(string item.path);
-		#entries of shatable is reused, so code for removing gently should be add
+		#FIXME: entries of shatable is reused, so code for removing gently should be add
 		#shatable.del(item.object.sha1);
 		children := item.object.children;
 		while(children != nil){
