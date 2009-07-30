@@ -40,6 +40,12 @@ Utils: module
 	allocnr:       fn(num: int): int;
 	readint:       fn(fd: ref Sys->FD): int;
 	readshort:     fn(fd: ref Sys->FD): int;
+	htons: 	       fn(n: int): int;
+	htonl: 	       fn(n: int): int;
+	htonb:	       fn(b: big): big;
+	ntohs: 	       fn(n: int): int;
+	ntohl:	       fn(n: int): int;
+	ntohb: 	       fn(b: big): big;
 
 	packqid:       fn(qid: ref Sys->Qid): array of byte;
 	unpackqid:     fn(buf: array of byte, offset: int): Sys->Qid;

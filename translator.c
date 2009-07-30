@@ -70,13 +70,15 @@ void convert()
 	}
 	
 	int entriescnt = write_header(ofd, header);
+	printf("entriescnt: %d\n", entriescnt);
 	entry = malloc(ENTRYSZ);
 	int i;
 	for(i = 0; i < entriescnt; i++){
 		fread(entry, ENTRYSZ, 1, ifd);
 		const unsigned char *sha1 = entry + 16;
-		int flags = *(int*)(sha1 + SHALEN);
+		int flags = ntohl(*(int*)(sha1 + SHALEN));
 		int namelen = flags & 0x0fff;
+		printf("namelen %d\n", namelen);
 		name = malloc(namelen + 1);
 		fread(name, namelen, 1, ifd);
 		write_entry(ofd, name, namelen, sha1);
@@ -116,10 +118,12 @@ void htonst(struct stat* st)
 
 write_entry(FILE* ofd, char* name, int namelen, const char* sha1)
 {
+	printf("name %s\n", name);
 	struct stat st;
 	path = sha1_to_path(sha1_to_hex(sha1));
 	if(stat(path, &st) == -1){
-		perror("sha1 stat error");
+		printf("sha1 is %s\n", path);
+		perror("sha1(%s) stat error");
 		exit(1);
 	}
 	free(path);
@@ -186,13 +190,14 @@ write_entry(FILE* ofd, char* name, int namelen, const char* sha1)
 
 int write_header(FILE* ofd, void* header)
 {
-	int signature = *(int*)(header);
-	int version = *(int*)(header + sizeof(0));
-	int entriescnt = *(int*)(header + sizeof(0) * 2);
-	*(int*)header = htonl(signature);	
-	*(int*)(header + sizeof(0)) = htonl(version);	
-	*(int*)(header + sizeof(0)*2) = htonl(entriescnt);	
+	int signature = ntohl(*(int*)(header));
+	int version = ntohl(*(int*)(header + sizeof(0)));
+	int entriescnt = ntohl(*(int*)(header + sizeof(0) * 2));
+//	*(int*)header = signature;	
+//	*(int*)(header + sizeof(0)) = htonl(version);	
+//	*(int*)(header + sizeof(0)*2) = htonl(entriescnt);	
 	
+	printf("sig: %d, ver: %d, cnt: %d\n", signature, version, entriescnt);
 	SHA1_Update(&ctx, header, HDRSZ);
 	if(fwrite(header, HDRSZ, 1, ofd) != 1){
 		perror("index write error");

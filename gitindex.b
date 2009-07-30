@@ -9,7 +9,7 @@ sprint: import sys;
 dirname, makeabsentdirs: import pathmod;	
 
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-bytes2int, bytes2big, big2bytes, comparebytes, debugmsg, error, int2bytes, filesha1, allocnr, mergesort, packqid, sha2string, unpackqid, equalshas: import utils;
+bytes2int, comparebytes, debugmsg, error, ntohl, htonl,int2bytes, filesha1, allocnr, mergesort, packqid, sha2string, unpackqid, equalshas: import utils;
 
 filebuf: array of byte;
 
@@ -41,7 +41,6 @@ initindex(): Index
 #FIXME: Use addentry
 Index.addfile(index: self ref Index, path : string): string 
 {
-	debugmsg("in index addfile\n");
 #no need for verification
 #	if(!verifypath(mntpt + path)){
 #		error(sprint("wrong path: %r\n"));
@@ -50,7 +49,6 @@ Index.addfile(index: self ref Index, path : string): string
 	#FIXME: Exclude code should be modified to be specific for each branch
 #	if(exclude->excluded(path)) return -1;
 
-	debugmsg("gitindex/addfile before if statement\n");
 	index.header.entriescnt++;
 	if(index.header.entriescnt * CLSBND >= index.hashcap){
 		oldentries := index.entries.all();
@@ -64,11 +62,9 @@ Index.addfile(index: self ref Index, path : string): string
 		}
 	}
 
-	debugmsg("gitindex/addfile before writeblobfile\n");
 	fullpath := repopath + getentrypath(path);
 	makeabsentdirs(dirname(fullpath));
 	sha1 := writeblobfile(fullpath);
-	debugmsg("gitindex/addfile after writeblobfile\n");
 
 	#only path from master/tree is needed
 	entry := initentry(getentrypath(path));
@@ -80,8 +76,6 @@ Index.addfile(index: self ref Index, path : string): string
 	}
 	else
 		index.entries.add(entry.name, entry);
-
-	debugmsg(sprint("File added: %s\n", sha2string(entry.sha1)));
 
 	return sha2string(entry.sha1);
 }
@@ -149,8 +143,6 @@ Index.addentry(index: self ref Index, entry: ref Entry)
 	index.entries.add(entry.name, entry);
 }
 
-
-
 Index.rmfile(index: self ref Index, path : string) 
 {
 	if(index.entries.find(path) == nil){
@@ -180,7 +172,6 @@ readindex(index:ref Index): int
 #return: number of elements read from index file
 readindexfrom(index:ref Index, path : string) : int
 {
-	debugmsg(sprint("index path is %s\n", indexpath));
 	indexfd := sys->open(indexpath, Sys->OREAD);
 
 	if(indexfd == nil){
@@ -304,33 +295,21 @@ writeindexto(index:ref Index, path : string) : int
 	sys->seek(fd, big SHALEN, Sys->SEEKSTART);
 
 	state: ref Keyring->DigestState = nil;
-	temp := int2bytes(index.header.signature);
-	state = keyring->sha1(temp, len temp, nil, state);
-
-	temp = int2bytes(index.header.version);
-	state = keyring->sha1(temp, len temp, nil, state);
-
-	temp = int2bytes(index.header.entriescnt);
-	state = keyring->sha1(temp, len temp, nil, state);
-
 	entries := index.entries.all();
 	index.header.signature = CACHESIGNATURE; 
 	index.header.entriescnt = len entries;
 
 	header := index.header.pack();
+	state = keyring->sha1(header, len header, nil, state);
 	#FIXME: header entriescnt and len entries.all should equal
 	sys->write(fd, header, len header);
 
-	sys->print("writeindex: hentriescnt is: %d\n", index.header.entriescnt);
-	sys->print("writeindex: entriescnt  is: %d\n", len index.entries.all());
-	sys->print("writeindex: entriescnt  is: %x\n", index.header.signature);
 	cnt := 0;
 	entrybuf: array of byte;
 	for(l := mergesort(entries); l != nil; l = tl l)
 	{
 		entrybuf = (hd l).pack();
 		cnt := sys->write(fd, entrybuf, len entrybuf);
-		sys->print("entry: %s %s\n", (hd l).name, sha2string((hd l).sha1));
 		if(cnt != len entrybuf){
 			error(sprint("couldn't write entry to the file: %r\n"));
 			return cnt;
@@ -346,13 +325,9 @@ writeindexto(index:ref Index, path : string) : int
 	return index.header.entriescnt;
 }
 
-
-
-
 Header.unpack(buf : array of byte) : ref Header
 {
 	ret : Header;
-
 
 	ret.signature = bytes2int(buf, 0);
 	offset := INTSZ;
@@ -370,7 +345,6 @@ Header.pack(header : self ref Header) : array of byte
 {
 	ret := array[HEADERSZ] of byte;
 
-	
 	ret[:] = int2bytes(header.signature);
 	offset := INTSZ;
 
@@ -442,7 +416,6 @@ initentry(filename: string): ref Entry
 }
 
 
-
 verifypath(path : string) : int
 {
 	return !sys->stat(path).t0;
@@ -495,20 +468,4 @@ Entry.new(): ref Entry
 
 	return ref entry;
 }
-
-ntohl(num: int): int
-{
-	return (ntohs(num) << 16) | (ntohs(num >> 16));
-}
-
-
-ntohs(num: int): int
-{
-	ret := num & 16rff;
-	num >>= 8;
-	ret = (ret << 8) | (num & 16rff);
-
-	return ret;
-}
-
 

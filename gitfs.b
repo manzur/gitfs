@@ -95,7 +95,6 @@ addentry(ppath: big, name, sha1: string, dirstat: ref Sys->Dir, otype: string): 
 
 addfiletoindex(srcpath: big)
 {
-	sys->print("Adding to index\n");
 	direntry1 := table.find(string srcpath);
 	sys->print("adding file %s to index\n", direntry1.getfullpath());
 	sha1 := index.addfile(direntry1.getfullpath());
@@ -676,7 +675,6 @@ mainloop:
 						}
 						queries = tl queries;
 					}
-					sys->print("adding to index, direntry name is %s; parent name is %s\n", direntry.name, parent.name);
 					if(queries != nil){
 						addfiletoindex((srv.getfid((hd queries).fid)).path);
 					}

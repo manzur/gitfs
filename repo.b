@@ -5,7 +5,7 @@ include "mods.m";
 include "modules.m";
 
 sprint: import sys;
-comparebytes, debugmsg, error, int2bytes, packqid, readint, readshort, INTSZ, QIDSZ, SHALEN: import utils;	
+comparebytes, debugmsg, error, int2bytes, ntohl, packqid, readint, readshort, INTSZ, QIDSZ, SHALEN: import utils;	
 
 mods: Mods;
 indexpath, gitfsindexpath: string;
@@ -71,9 +71,9 @@ convertindex(): int
 	fd := sys->create(gitfsindexpath, Sys->OWRITE, 8r644);
 	indexfd := sys->open(indexpath, Sys->OREAD);
 	
-	signature := readint(indexfd);
-	version := readint(indexfd);
-	entriescnt := readint(indexfd);
+	signature := ntohl(readint(indexfd));
+	version := ntohl(readint(indexfd));
+	entriescnt := ntohl(readint(indexfd));
 
 	sys->write(fd, sha1, len sha1);
 	sys->write(fd, int2bytes(signature), INTSZ);
@@ -156,21 +156,6 @@ isdir(path: string): int
 {
 	(ret, dirstat) := sys->stat(path);
 	return !ret && dirstat.mode & Sys->DMDIR;
-}
-
-ntohl(num: int): int
-{
-	return (ntohs(num) << 16) | (ntohs(num >> 16));
-}
-
-
-ntohs(num: int): int
-{
-	ret := num & 16rff;
-	num >>= 8;
-	ret = (ret << 8) | (num & 16rff);
-
-	return ret;
 }
 
 readgarbage(fd: ref Sys->FD, namelen, flags: int)

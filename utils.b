@@ -73,7 +73,6 @@ readsha1file(shafilename: string): (string, int, array of byte)
 		error(sprint("file(%s) not found\n", string2path(shafilename)));
 		return ("", 0, nil);
 	}
-	debugmsg("after if\n");
 	rqchan := inflatefilter->start("z");
 	old := array[0] of byte;
 
@@ -116,8 +115,9 @@ mainloop:
 
 	pos := strchr(string old[:i], ' ');
 
-	debugmsg("finishing readhs1\n");
-	return (string old[:pos], bytes2int(old, pos + 1), old[i+1:]);
+	sys->print("size: %d\n", asbytes2int(old, pos + 1, i));
+
+	return (string old[:pos], asbytes2int(old, pos + 1, i), old[i+1:]);
 }
 
 strchr(s: string, ch: int): int
@@ -296,14 +296,22 @@ bytes2int(buf: array of byte, offset: int): int
 {
 	ret := 0;
 	for(i := 0; i < INTSZ; i++)
-		ret |= int(buf[offset + i]) << (i * 8); 
+		ret = (ret << 8) | int(buf[offset + i]); 
+	return ret;
+}
+
+asbytes2int(buf: array of byte, offset, end: int): int
+{
+	ret := 0;
+	for(i := 0; i + offset < end; i++)
+		ret = (ret << 8) | int(buf[offset + i] - byte '0'); 
 	return ret;
 }
 
 bytes2big(buf: array of byte, offset: int): big
 {
-	return (big bytes2int(buf,offset + INTSZ) << INTSZ * 8)| 
-	       (big bytes2int(buf, offset));
+	return (big bytes2int(buf, offset) << (INTSZ * 8)) |
+		(big bytes2int(buf,offset + INTSZ));
 
 }
 
@@ -314,8 +322,8 @@ big2bytes(n: big): array of byte
 	part1 := int (n >> 32);
 	part2 := int n;
 
-	ret[:] = int2bytes(part2);
-	ret[INTSZ:] = int2bytes(part1);
+	ret[:] = int2bytes(part1);
+	ret[INTSZ:] = int2bytes(part2);
 	
 	return ret;
 }
@@ -324,18 +332,59 @@ int2bytes(number: int): array of byte
 {
 	ret := array[INTSZ] of byte;
 
-	ret[0] = byte (number & 16rff);
+	ret[3] = byte (number & 16rff);
 	number >>= 8;
 
-	ret[1] = byte (number & 16rff);
-	number >>= 8;
-	
 	ret[2] = byte (number & 16rff);
 	number >>= 8;
 	
-	ret[3] = byte (number & 16rff);
+	ret[1] = byte (number & 16rff);
+	number >>= 8;
+	
+	ret[0] = byte (number & 16rff);
 	
 	return ret;
+}
+
+htons(n: int): int
+{
+	part1 := (n & 16rff00);
+	part2 := (n & 16r00ff);
+
+	return part2 | part1;
+}
+
+ntohs(n: int): int
+{
+	return htons(n);
+}
+
+htonl(n: int): int
+{
+	part2 := (n & 16rffff);
+	n >>= 16;
+	part1 := (n & 16rffff);
+
+	return (htons(part1) << 16) | htons(part2);
+}
+
+ntohl(n: int): int
+{
+	return htonl(n);
+}
+
+htonb(b: big): big
+{
+	part2 := (int b & ~0);
+	b >>= 32;
+	part1 := (int b & ~0);
+
+	return big ((part1 << 32) | part2);
+}
+
+ntohb(b: big): big
+{
+	return htonb(b);
 }
 
 allocnr(num: int): int
