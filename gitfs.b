@@ -93,16 +93,18 @@ addentry(ppath: big, name, sha1: string, dirstat: ref Sys->Dir, otype: string): 
 	return direntry.path;
 }
 
-addfiletoindex(direntry: ref Direntry, fid: ref Fid)
+addfiletoindex(srcpath: big)
 {
 	sys->print("Adding to index\n");
-	direntry1 := table.find(string fid.path);
+	direntry1 := table.find(string srcpath);
 	sys->print("adding file %s to index\n", direntry1.getfullpath());
 	sha1 := index.addfile(direntry1.getfullpath());
 
-	parent := direntry;
-	while(!(parent.object.dirstat.mode & Sys->DMDIR)){
+	parent := table.find(string QIndex);
+	mode := parent.object.dirstat.mode;
+	while(!(mode & Sys->DMDIR)){
 		parent = table.find(string parent.parent);
+		mode = parent.object.dirstat.mode;
 	}
 	(nil, direntry1.name) = stringmod->splitstrr(direntry1.getfullpath(),"/tree/");
 	q := q1 := QMax++;
@@ -674,9 +676,9 @@ mainloop:
 						}
 						queries = tl queries;
 					}
-
+					sys->print("adding to index, direntry name is %s; parent name is %s\n", direntry.name, parent.name);
 					if(queries != nil){
-						addfiletoindex(direntry, srv.getfid((hd queries).fid));
+						addfiletoindex((srv.getfid((hd queries).fid)).path);
 					}
 				}
 
@@ -730,6 +732,15 @@ mainloop:
 				if(parent != nil)
 					ptype = parent.object.otype;
 				
+				#DELME:
+				if(direntry.object.otype == "work" && m.stat.name == "index"){
+					addfiletoindex(fid.path);
+					srv.reply(ref Rmsg.Wstat(m.tag));
+					continue mainloop;
+
+				}
+
+
 				#parent dir is commit type, renaming tree dir to commit dir
 				if(ptype == "commit" &&  direntry.name == "tree" && m.stat.name == "commit"){
 					treesha1 := writetree(index);
