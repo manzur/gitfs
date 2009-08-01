@@ -31,6 +31,7 @@ Utils: module
 	sha2string:    fn(sha: array of byte): string;
 	string2sha:    fn(sha1: string): array of byte;
 
+	mktempfile:    fn(filename: string): string;
 	mergesort:     fn(l: list of ref Gitindex->Entry): list of ref Gitindex->Entry;
 	comparebytes:  fn(a, b: array of byte): int;
 	bytes2int:     fn(buf: array of byte, offset: int): int;

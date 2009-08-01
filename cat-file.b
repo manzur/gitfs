@@ -1,13 +1,13 @@
 implement Catfile;
 
-	
 include "gitfs.m";
 include "mods.m";
 
 mods: Mods;
 include "modules.m";
 
-bytepos, sha2string, SHALEN: import utils;	
+sprint: import sys;
+bytepos, error, sha2string, SHALEN: import utils;	
 
 printtypeonly := 0;
 
@@ -32,7 +32,7 @@ catfile(path: string, msgchan: chan of array of byte)
 
 	if(filetype == "tree")
 		msgchan <-= sys->aprint("%s", str);
-	else
+	else 
 		msgchan <-= buf[:];
 }
 

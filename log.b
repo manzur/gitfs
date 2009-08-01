@@ -56,7 +56,6 @@ printlist(l: list of ref Commit)
 
 toint(b: int): int
 {
-	sys->print("toprint(): %c==%d\n", b, b - '0');
 	return b - '0';
 }
 
@@ -65,8 +64,6 @@ dateformatconv(s: string): string
 	(s1, s2) := stringmod->splitl(s, ">");
 	s2 = s2[1:];
 	(time, off) := stringmod->toint(s2, 10);
-	sys->print("BB=>%d\n", time);
-	sys->print("AA===>%s\n", off);
 	off = off[1:];
 	date := daytime->text(daytime->local(time));
 

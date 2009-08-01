@@ -12,7 +12,7 @@ readindex, writeindex, Entry, Header, Index: import gitindex;
 readtreebuf, Tree: import treemod;
 basename, cleandir, makeabsentdirs, makepathabsolute, string2path, INDEXPATH, HEADSPATH, OBJECTSTOREPATH: import pathmod;	
 readtree: import readtreemod;	
-bufsha1, debugmsg, error, sha2string, splitl, strip, SHALEN: import utils;
+bufsha1, debugmsg, error, mktempfile, sha2string, splitl, strip, SHALEN: import utils;
 writetree: import writetreemod;	
 
 include "gitfs.m";
@@ -68,7 +68,7 @@ init(nil: ref Draw->Context, args: list of string)
 	styx->init();
 	styxservers->init(styx);
 	
-	styxservers->traceset(1);
+#	styxservers->traceset(1);
 	navch := chan of ref Navop;
 	nav = Navigator.new(navch);
 	spawn navigate(navch);
@@ -591,7 +591,6 @@ mainloop:
 					srv.reply(styxservers->readbytes(m, buf));
 				}
 				else{
-	
 					if(direntry.object.otype == "work"){
 						buf := array[m.count] of byte;
 						fd := sys->open(direntry.object.sha1, Sys->OREAD);
@@ -681,10 +680,13 @@ mainloop:
 				}
 
 				if(ptype == "commit" && direntry.name == "commit_msg"){
-					oldcommitmsg := commitmsg;
-					commitmsg = array[len oldcommitmsg + len m.data] of byte;
-					commitmsg[:] = oldcommitmsg;
-					commitmsg[len oldcommitmsg:] = m.data;
+					newname := sprint("commit_msg%bd", direntry.path);
+					path := mktempfile(newname);
+					fd := sys->open(path, Sys->OWRITE);
+					sys->seek(fd, m.offset, Sys->SEEKRELA);
+					cnt = sys->write(fd, m.data, len m.data);
+					direntry.object.otype = "work";
+					direntry.object.sha1 = path;
 				}
 				srv.reply(ref Rmsg.Write(m.tag, cnt));
 			
@@ -742,7 +744,8 @@ mainloop:
 				#parent dir is commit type, renaming tree dir to commit dir
 				if(ptype == "commit" &&  direntry.name == "tree" && m.stat.name == "commit"){
 					treesha1 := writetree(index);
-					sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, string commitmsg);
+					child := child(parent, "commit_msg");
+					sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, child.object.sha1);
 					sys->print("commited to: %s\n", sha1);
 					#commitmsg = nil;
 					dirstat := sys->stat(pathmod->string2path(sha1)).t1;
@@ -759,6 +762,14 @@ mainloop:
 					newentry := table.find(string path);
 					readchildren(sha1, path);
 					updatehead(branchname, sha1);
+
+					#restoring prev commit msg for parent
+					child.object.otype = nil;
+					child.object.sha1 = parent.object.sha1;
+					catch := chan of array of byte;
+					spawn catfilemod->catfile(child.object.sha1, catch);
+					child.object.data = <-catch;
+
 					srv.reply(ref Rmsg.Wstat(m.tag));
 					spawn chdir();
 					continue mainloop;

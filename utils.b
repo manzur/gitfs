@@ -114,9 +114,6 @@ mainloop:
 	}
 
 	pos := strchr(string old[:i], ' ');
-
-	sys->print("size: %d\n", asbytes2int(old, pos + 1, i));
-
 	return (string old[:pos], asbytes2int(old, pos + 1, i), old[i+1:]);
 }
 
@@ -613,7 +610,6 @@ packqid(qid: ref Sys->Qid): array of byte
 	packedqid[offset:] = int2bytes(qid.qtype);
 	offset += INTSZ;
 
-	sys->write(sys->fildes(1), packedqid, QIDSZ);
 	return packedqid;
 }
 
@@ -647,3 +643,12 @@ unpackqid(buf: array of byte, offset: int): Sys->Qid
 	return Sys->Qid(path, vers, qtype);
 }
 
+
+mktempfile(filename: string): string
+{
+	fd := sys->create("/tmp/" + filename, Sys->OWRITE, 8r644);
+	if(fd == nil){
+		error(sprint("file(%s) coudn't be created\n", filename));
+	}
+	return "/tmp/" + filename;
+}

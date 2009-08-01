@@ -16,11 +16,10 @@ init(m: Mods)
 {
 	mods = m;
 	deflatefilter->init();
-	parents: list of string = nil;
 }
 
 #returns sha1 of the new commit
-commit(treesha: string, parents: list of string, comments: string): string
+commit(treesha: string, parents: list of string, path: string): string
 {
 	if(!pathmod->shaexists(treesha)){
 		error(sprint("no such tree(%s) file: %r\n", treesha));
@@ -40,30 +39,44 @@ commit(treesha: string, parents: list of string, comments: string): string
 		parents = tl parents;
 	}
 
-	
-#	authorname := env->getenv("AUTHOR_NAME");
-#	authoremail := env->getenv("AUTHOR_EMAIL");
-#	authordate := env->getenv("AUTHOR_DATE");
-#	
-#	if(authorname == "" || authoremail == ""){
-#		(authorname, authoremail) = getpersoninfo("author");	
-#	}
-#
-#	(comname, comemail) := (config.find("user"), config.find("email")););
-#	if(comname == "" || comemail == ""){
-#		(comname, comemail) = getpersoninfo("committer");
-#	}
+	author, committer, comments: string;
+	ibuf := bufio->open(path, Bufio->OREAD);
+	if(ibuf == nil){
+		error(sprint("Error in commit msg(%s) and will commit default\n", path));
+		return nil;
+	}
 
-	author := getauthorinfo();
-	committer := getcommitterinfo();
+	if(iscommitfile(ibuf)){
+		s: string;
+		#commitfile contains raw commit msg
+		while((s = ibuf.gets('\n')) != nil){
+			if(stringmod->prefix("author", s)){
+				author = s;
+			}
+			else if(s == "\n")
+				break;
+		}
+	}
 
-#	commitmsg += "author " + authorname + " <" + authoremail + "> " + authordate + "\n";
-#	commitmsg += "committer " + comname + " <" + comemail + "> " + date + "\n\n";
+	#reading comments field
+	comments += ibuf.gets('\0');		
+
+	if(author == nil){
+		author = getauthorinfo();
+	}
+	committer = getcommitterinfo();
 	commitmsg += author + committer;
 
 	#Should add code for adding encoding field, if in the encoding of Inferno OS changes
 	commitmsg += comments;
+
+	return commitbuf(commitmsg);
+}
+
+commitbuf(commitmsg: string): string
+{
 	commitlen := int2string(len commitmsg);
+
 	#6 - "commit", 1 - " ", 1 - '\0'
 	buf := array[6 + 1 + len commitlen + 1 + len commitmsg] of byte;
 
@@ -89,6 +102,13 @@ commit(treesha: string, parents: list of string, comments: string): string
 	return ret;
 }
 
+iscommitfile(ibuf: ref Iobuf): int
+{
+	s := ibuf.gets('\n');
+	ibuf.seek(big -len s, Bufio->SEEKRELA);
+	return stringmod->prefix("tree ", s);
+}
+
 
 curtime(): string
 {
@@ -109,7 +129,6 @@ getcommitterinfo(): string
 	mail := configmod->getstring("user.email");
 	s: string;
 	if((s = env->getenv("GIT_COMMITTER_NAME")) != nil){
-		sys->print("COMNAME: %s\n", s);
 		name = utils->strip(s);
 	}
 	if((s = env->getenv("GIT_COMMITTER_MAIL")) != nil){
@@ -125,7 +144,6 @@ getcommitterinfo(): string
 
 	info := "committer " + name + " <" + mail+ "> " + curtime() + "\n\n";
 
-	sys->print("cominfo==>:%s\n", info);
 	return info;
 }
 
@@ -142,7 +160,6 @@ getauthorinfo(): string
 getcomment(): string
 {
 	ibuf := bufio->fopen(sys->fildes(0), bufio->OREAD);	
-	sys->print("Comments: ");
 	return ibuf.gets('\0');
 }
 
