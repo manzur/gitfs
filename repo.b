@@ -60,7 +60,6 @@ checkstructure(): int
 
 convertindex(): int
 {
-	sys->print("heheheh\n");
 	sha1 := array[SHALEN] of byte;
 	if(indicesmatch(sha1)){
 		sys->print("indices match\n");

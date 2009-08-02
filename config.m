@@ -8,6 +8,7 @@ Configmod: module
 	getint: fn(key: string): (int, int);
 	getstring: fn(key: string): string;
 	init: fn(mods: Mods);
+	printall: fn();
 	readconfig: fn(path: string): int;
 	setbool: fn(key: string, val: int): int;
 	setint: fn(key: string, val: int): int;

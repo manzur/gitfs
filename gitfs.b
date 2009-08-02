@@ -28,6 +28,7 @@ arglist: list of string;
 commitmsg: array of byte;
 debug: int;
 heads: list of ref Head;
+indexkeyword := "index";
 nav: ref Navigator;
 readqueries: ref Table[list of Readquery];
 srv: ref Styxserver;
@@ -62,8 +63,10 @@ init(nil: ref Draw->Context, args: list of string)
 	sys->pctl(Sys->NEWPGRP, nil);
 	inittable();
 
-	
 	configmod->readconfig("");
+	if(configmod->getstring("gitfs.keyword") != nil){
+		indexkeyword = configmod->getstring("gitfs.keyword");
+	}
 
 	styx->init();
 	styxservers->init(styx);
@@ -771,7 +774,7 @@ mainloop:
 				if(parent != nil)
 					ptype = parent.object.otype;
 				
-				if(direntry.object.otype == "work" && m.stat.name == "index"){
+				if(direntry.object.otype == "work" && m.stat.name == indexkeyword){
 					addfiletoindex(fid.path);
 					srv.reply(ref Rmsg.Wstat(m.tag));
 					continue mainloop;

@@ -105,7 +105,6 @@ getsectionname(fd: ref Sys->FD): (int, string)
 getstring(key: string): string
 {
 	item := configs.find(key);
-	sys->print("for key:%s,item is nil?%d\n", key, item == nil);
 	if(item == nil) 
 		return nil;
 	
@@ -132,6 +131,15 @@ readconfig(path: string): int
 	readenv();
 
 	return 0;
+}
+
+printall()
+{
+	l := getall();
+	while(l != nil){
+		sys->print("key=%s; value=%s\n", (hd l).t0, (hd l).t1);
+		l = tl l;
+	}
 }
 
 readenv()
