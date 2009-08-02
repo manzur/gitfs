@@ -124,7 +124,8 @@ Table of Contents:
 		Branch is done when commit to the non-head commit. The new branch 
 		is created with the name commit<sha1-abbrev>. For example, if you're
 		located in the parents of the head of any branch, commiting it will create
-		a new branch.
+		a new branch. If the name of the new created branch doesn't correspond to your
+		expectations you can rename it via `mv`.
 
 		Another way of creating a branch without creating a new commit is just renaming
 		tree dir to <somename>, where <somename> is acceptable branch name.
