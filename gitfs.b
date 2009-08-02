@@ -93,6 +93,21 @@ addentry(ppath: big, name, sha1: string, dirstat: ref Sys->Dir, otype: string): 
 	return direntry.path;
 }
 
+addentrywithqid(path, ppath: big, name, sha1: string, dirstat: ref Sys->Dir, otype: string): big 
+{
+	shaobject := ref Shaobject(dirstat, nil, sha1, otype, nil);
+	direntry := ref Direntry(path, name, shaobject, ppath);
+
+	table.add(string direntry.path, direntry);
+	if(sha1 != nil)
+		shatable.add(shaobject.sha1, shaobject);
+	
+	parent := table.find(string ppath);
+	parent.object.children = path :: parent.object.children;
+
+	return direntry.path;
+}
+
 addfiletoindex(srcpath: big)
 {
 	direntry1 := table.find(string srcpath);
@@ -119,6 +134,20 @@ addfiletoindex(srcpath: big)
 	#initindex();
 	path := addentry(parent.path, direntry1.name, sha1, direntry1.object.dirstat, "index");
 
+}
+
+addhead(name, sha1: string)
+{
+	head := ref Head(name, sha1);
+	heads = head :: heads;
+}
+
+addheadfile(name, sha1: string)
+{
+	fd := sys->create(repopath + ".git/refs/heads/" + name, Sys->OWRITE, 8r644);
+	buf := array of byte (sha1 + "\n");
+	sys->write(fd, buf, len buf);
+	addhead(name, sha1);
 }
 
 checkout(parent: ref Direntry, direntry: ref Direntry)
@@ -363,6 +392,16 @@ inittable()
 	table.add(string direntry.path, direntry);
 
 	initindex();
+}
+
+isbranching(path: string): int
+{
+	cnt := 0;
+	for(i := 0; i < len path; i++){
+		if(path[i] == '/') cnt++;
+	}
+
+	return cnt > 1;
 }
 
 istreedir(direntry: ref Direntry): int
@@ -732,47 +771,74 @@ mainloop:
 				if(parent != nil)
 					ptype = parent.object.otype;
 				
-				#DELME:
 				if(direntry.object.otype == "work" && m.stat.name == "index"){
 					addfiletoindex(fid.path);
 					srv.reply(ref Rmsg.Wstat(m.tag));
 					continue mainloop;
-
+				}
+				if(parent != nil && parent.path == QRoot){
+					if(sys->wstat(repopath + ".git/refs/heads/" + direntry.name, m.stat) != -1){
+						direntry.name = m.stat.name;
+					}
+					removehead(direntry.name);
+					addhead(direntry.name, direntry.object.sha1);
+					srv.reply(ref Rmsg.Wstat(m.tag));
+					continue mainloop;
 				}
 
-
 				#parent dir is commit type, renaming tree dir to commit dir
-				if(ptype == "commit" &&  direntry.name == "tree" && m.stat.name == "commit"){
-					treesha1 := writetree(index);
-					child := child(parent, "commit_msg");
-					sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, child.object.sha1);
-					sys->print("commited to: %s\n", sha1);
-					#commitmsg = nil;
-					dirstat := sys->stat(pathmod->string2path(sha1)).t1;
+				if(ptype == "commit" &&  direntry.name == "tree"){
+					if (m.stat.name == "commit"){
+						treesha1 := writetree(index);
+						ch := child(parent, "commit_msg");
+						sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, ch.object.sha1);
+						sys->print("commited to: %s\n", sha1);
+						dirstat := sys->stat(pathmod->string2path(sha1)).t1;
 
-					#FIXME: race condition: QMax could change before calling addentry
-					branchname := stringmod->splitl(direntry.getfullpath(), "/").t0;
-					(nil, nil, filebuf) := utils->readsha1file(sha1);
-					path := addentry(QRoot, branchname, sha1, makedirstat(QMax, dirstat), "commit");
-					parent.name = "parent11";
-					table.del(string parent.path);
-					table.add(string parent.path, parent);
-					removechild(table.find(string QRoot), parent.path);
+						fullpath := direntry.getfullpath();
+						branchname := stringmod->splitl(fullpath, "/").t0;
+						root := table.find(string QRoot);
+						branch := child(root, branchname);
+						(nil, nil, filebuf) := utils->readsha1file(sha1);
+
+						path: big;
+						if(isbranching(fullpath)){
+							path = addentry(QRoot, "commit" + sha1[:7], sha1, makedirstat(QMax, dirstat), "commit");
+							addheadfile("commit" + sha1[:7], sha1);
+						}
+						else{
+							path = addentry(QRoot, branchname, sha1, makedirstat(QMax, dirstat), "commit");
+							parent.name = "parent11";
+							table.del(string parent.path);
+							table.add(string parent.path, parent);
+							removechild(table.find(string QRoot), parent.path);
+							updatehead(branchname, sha1);
+						}
+
+						readchildren(sha1, path);
 					
-					newentry := table.find(string path);
-					readchildren(sha1, path);
-					updatehead(branchname, sha1);
+					
+						#restoring prev commit msg for parent
+						ch.object.otype = nil;
+						ch.object.sha1 = parent.object.sha1;
+						catch := chan of array of byte;
+						spawn catfilemod->catfile(ch.object.sha1, catch);
+						ch.object.data = <-catch;
 
-					#restoring prev commit msg for parent
-					child.object.otype = nil;
-					child.object.sha1 = parent.object.sha1;
-					catch := chan of array of byte;
-					spawn catfilemod->catfile(child.object.sha1, catch);
-					child.object.data = <-catch;
+						cm := commitmod->readcommit(parent.object.sha1);
+						readchildren(cm.treesha1, parent.path);
 
-					srv.reply(ref Rmsg.Wstat(m.tag));
-					spawn chdir();
-					continue mainloop;
+						srv.reply(ref Rmsg.Wstat(m.tag));
+						spawn chdir();
+						continue mainloop;
+					}
+					else{
+						dirstat := sys->stat(pathmod->string2path(parent.object.sha1)).t1;
+						path := addentry(QRoot, m.stat.name, parent.object.sha1, makedirstat(QMax, dirstat), "commit");
+						addheadfile(m.stat.name, parent.object.sha1);
+						srv.reply(ref Rmsg.Wstat(m.tag));
+						continue mainloop;
+					}
 				}
 
 				srv.default(m);
@@ -847,7 +913,6 @@ readchildren(sha1: string, parentqid: big)
 		createlogstat(parent, ref dirstat, commit.comment);
 	}
 	else if(filetype == "tree"){
-		debugmsg("file tteee\n");
 		tree := readtreebuf(sha1, filebuf);
 
 		l := tree.children;
@@ -1000,6 +1065,17 @@ removefile(direntry: ref Direntry)
 	removeentry(direntry.path);
 }
 
+removehead(name: string)
+{
+	l: list of ref Head;
+	while(heads != nil){
+		if((hd l).name == name)
+			continue;
+		l = hd heads :: l;
+	}
+	heads = l;
+}
+
 removeindexentry(direntry, parent: ref Direntry)
 {
 	dirstat := direntry.getdirstat();
@@ -1023,7 +1099,7 @@ updatehead(branch: string, sha1: string)
 {
 	fd := sys->open(repopath + ".git/refs/heads/" + branch, Sys->OWRITE);
 	if(fd != nil){
-		buf := array of byte sha1;
+		buf := array of byte (sha1 + "\n");
 		cnt := sys->write(fd, buf, len buf);
 	}
 }

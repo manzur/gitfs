@@ -102,6 +102,9 @@ Table of Contents:
 		After that you should be able to copy files to the binded dir. 
 		That's much more convenient than pointing path to index/ every time.
 		
+		The second method of adding files to the index is just renaming it to 'index':
+			mv file1 index
+		
 	
 	Committting
 		
@@ -116,3 +119,13 @@ Table of Contents:
 		so that you're located in the new commit directory.
 
 
+	Branching
+		
+		Branch is done when commit to the non-head commit. The new branch 
+		is created with the name commit<sha1-abbrev>. For example, if you're
+		located in the parents of the head of any branch, commiting it will create
+		a new branch.
+
+		Another way of creating a branch without creating a new commit is just renaming
+		tree dir to <somename>, where <somename> is acceptable branch name.
+			
