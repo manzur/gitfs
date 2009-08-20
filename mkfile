@@ -1,7 +1,6 @@
 MODDIR=/module
 DISBIN=/dis/git
 
-
 TARG=\
 	cat-file.dis\
 	checkout.dis\
@@ -49,4 +48,5 @@ LIMBOFLAGS=-g
 
 modinstall:V: $MODULES
 	cp *.m /module/
+
 

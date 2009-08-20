@@ -26,6 +26,7 @@ Utils: module
 	
 	onlyspace:     fn(s: string): int;
 	int2string:    fn(num: int): string;
+	replacechar:   fn(s: string, c1, c2: int): string;
 
 	save2file:     fn(path: string, buf: array of byte): int;
 	sha2string:    fn(sha: array of byte): string;

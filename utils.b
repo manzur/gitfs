@@ -117,6 +117,14 @@ mainloop:
 	return (string old[:pos], asbytes2int(old, pos + 1, i), old[i+1:]);
 }
 
+replacechar(s: string, c1, c2: int): string
+{
+	for(i := 0; i < len s; i++){
+		if(s[i] == c1) s[i] = c2;
+	}
+	return s;
+}
+
 strchr(s: string, ch: int): int
 {
 	for(i := 0; i < len s; i++){

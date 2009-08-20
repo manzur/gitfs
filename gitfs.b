@@ -373,7 +373,9 @@ inittable()
 	ret: int;
 	shaobject: ref Shaobject;
 	
-	heads = heads1 := readheads(repopath + HEADSPATH, "");
+	l1 := readheads(repopath + HEADSPATH, "");
+	l2 := readpackedheads();
+	heads = heads1 := mergelist(l1, l2);
 	while(heads1 != nil){
 		head := hd heads1;
 		(ret, dirstat) = sys->stat(string2path(head.sha1));
@@ -509,6 +511,26 @@ mapworkingtree(path: big)
 	sha1 := item.object.sha1;
 	mapfile(repopath[:len repopath-1], item);
 	mapdir(item.object.sha1, item);
+}
+
+mergelist(l1, l2: list of ref Head): list of ref Head
+{
+	if(l1 == nil) return l2;
+
+	while(l2 != nil){
+		elem := hd l1;
+		l := l1;
+		while(l != nil){
+			sys->print("l=nil?%d\n", l == nil);
+			if((hd l).name == elem.name) break;
+			l = tl l;
+		}
+		if(l == nil){
+			l1 = elem :: l1;
+		}
+		l2 = tl l2;
+	}
+	return l1;
 }
 
 navigate(navch: chan of ref Navop)
@@ -1000,6 +1022,28 @@ readlog(head: string, moffset: big, mcount: int): array of byte
 	return buf;
 }
 
+readpackedheads(): list of ref Head
+{
+	l: list of ref Head;
+	ibuf := bufio->open(repopath + ".git/packed-refs", Sys->OREAD);
+	sys->print("path==%s\n", repopath + "packed-refs");
+	if(ibuf != nil){
+		while((s := ibuf.gets('\n')) != nil){
+#FIXME: should add code for processing packed-refs traits
+			sys->print("==>%s\n", s);
+			if(s[0] == '#') continue;
+			(s1, s2) := stringmod->splitl(s, " ");	
+			s2 = s2[1:len s2 - 1];
+			(nil, s2) = stringmod->splitstrr(s2, "heads/");
+			s2 = utils->replacechar(s2, '/', '+');
+			head := ref Head(s2, s1);
+			l = head :: l;
+		}
+	}
+	sys->print("l is nil?%d\n", l == nil);
+	return l;
+}
+
 Readquery.contains(readquery: self ref Readquery, s: string): int
 {
 	data := readquery.qdata.data;
@@ -1100,7 +1144,11 @@ removeindexentry(direntry, parent: ref Direntry)
 
 updatehead(branch: string, sha1: string)
 {
-	fd := sys->open(repopath + ".git/refs/heads/" + branch, Sys->OWRITE);
+	fullpath := repopath + ".git/refs/heads/" + branch;
+	fd := sys->open(fullpath, Sys->OWRITE);
+	if(fd == nil)
+		fd = sys->create(fullpath, Sys->OWRITE, 8r644);
+
 	if(fd != nil){
 		buf := array of byte (sha1 + "\n");
 		cnt := sys->write(fd, buf, len buf);
