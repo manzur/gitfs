@@ -31,6 +31,7 @@ include "config.m";
 include "gitfs.m";
 include "gitindex.m";
 include "log.m";
+include "pack.m";
 include "path.m";
 include "repo.m";
 include "tree.m";
@@ -70,6 +71,10 @@ init(path: string, deb: int)
 	configmod = load Configmod Configmod->PATH;
 	gitindex = load Gitindex Gitindex->PATH;
 	log = load Log Log->PATH;
+	packmod = load Packmod Packmod->PATH;
+	sys->print("before if\n");
+	if(packmod == nil)
+		sys->print("PACKMOD is nil\n");
 	pathmod = load Pathmod Pathmod->PATH;
 	repo = load Repo Repo->PATH;
 	treemod = load Treemod Treemod->PATH;

@@ -70,8 +70,12 @@ readsha1file(shafilename: string): (string, int, array of byte)
 	debugmsg("in readshafile\n");
 	fd := sys->open(string2path(shafilename), Sys->OREAD);
 	if(fd == nil){
-		error(sprint("file(%s) not found\n", string2path(shafilename)));
-		return ("", 0, nil);
+		(filetype, filesize, filebuf) := packmod->readpackedobject(shafilename);
+		if(filebuf == nil){
+			error(sprint("file(%s) not found\n", string2path(shafilename)));
+			return ("", 0, nil);
+		}
+		return (filetype, filesize, filebuf);
 	}
 	rqchan := inflatefilter->start("z");
 	old := array[0] of byte;
@@ -133,6 +137,17 @@ strchr(s: string, ch: int): int
 	}
 	return -1;
 }
+
+objectstat(name: string): (int, Sys->Dir)
+{
+	(ret, dirstat) := sys->stat(string2path(name));
+	if(ret == -1){
+		return packmod->stat(name);
+	}
+
+	return (ret, dirstat);
+}
+
 
 sha2string(sha: array of byte): string
 {

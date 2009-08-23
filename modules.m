@@ -28,6 +28,7 @@ include "commit-tree.m";
 include "config.m";
 include "gitindex.m";
 include "log.m";
+include "pack.m";
 include "path.m";
 include "repo.m";
 include "tree.m";
@@ -35,6 +36,6 @@ include "read-tree.m";
 include "utils.m";
 include "write-tree.m";
 
-catfilemod, checkoutmod, commitmod, committree, configmod, gitindex, log, pathmod, repo, treemod, readtreemod, utils, writetreemod: import mods;
+catfilemod, checkoutmod, commitmod, committree, configmod, gitindex, log, packmod, pathmod, repo, treemod, readtreemod, utils, writetreemod: import mods;
 
 index, repopath, shatable: import  mods;

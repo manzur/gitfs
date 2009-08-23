@@ -11,6 +11,7 @@ TARG=\
 	gitindex.dis\
 	log.dis\
 	mods.dis\
+	pack.dis\
 	path.dis\
 	read-tree.dis\
 	repo.dis\
@@ -30,6 +31,7 @@ MODULES=\
 	log.m\
 	mods.m\
 	modules.m\
+	pack.m\
 	path.m\
 	read-tree.m\
 	repo.m\
