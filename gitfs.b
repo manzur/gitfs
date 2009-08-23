@@ -233,7 +233,6 @@ Direntry.getfullpath(direntry: self ref Direntry): string
 	}
 
 	return ret;
-
 }
 
 fillindexdir(parent: ref Direntry, stage: int)
@@ -353,6 +352,7 @@ initmodules()
 	configmod->init(mods);
 	gitindex->init(mods);
 	log->init(mods);
+	#packmod->init(mods);
 	pathmod->init(mods);
 	repo->init(mods);
 	treemod->init(mods);
@@ -374,13 +374,13 @@ inittable()
 	shaobject: ref Shaobject;
 	
 	l1 := readheads(repopath + HEADSPATH, "");
-	l2 := readpackedheads();
+	l2 : list of ref Head = nil; readpackedheads();
 	heads = heads1 := mergelist(l1, l2);
 	while(heads1 != nil){
 		head := hd heads1;
-		(ret, dirstat) = sys->stat(string2path(head.sha1));
-		if(ret == -1){
+		if(!utils->objectexists(head.sha1)){
 			error(sprint("head %s couldn't be accessed\n", string2path(head.sha1)));
+			heads1 = tl heads;
 			continue;
 		}
 		q := QMax++;

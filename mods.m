@@ -26,6 +26,7 @@ Mods: module
 	configmod: Configmod;
 	gitindex: Gitindex;
 	log: Log;
+	packmod: Packmod;
 	pathmod: Pathmod;
 	repo: Repo;
 	treemod: Treemod;
