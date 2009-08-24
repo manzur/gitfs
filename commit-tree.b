@@ -53,13 +53,15 @@ commit(treesha: string, parents: list of string, path: string): string
 			if(stringmod->prefix("author", s)){
 				author = s;
 			}
-			else if(s == "\n")
+			else if(s == "\n"){
 				break;
+			}
 		}
 	}
 
 	#reading comments field
-	comments += ibuf.gets('\0');		
+
+	comments += ibuf.gets(-1);		
 
 	if(author == nil){
 		author = getauthorinfo();
@@ -67,7 +69,7 @@ commit(treesha: string, parents: list of string, path: string): string
 	committer = getcommitterinfo();
 	commitmsg += author + committer;
 
-	#Should add code for adding encoding field, if in the encoding of Inferno OS changes
+	#FIXME: Should add code for adding encoding field
 	commitmsg += comments;
 
 	return commitbuf(commitmsg);
@@ -76,13 +78,14 @@ commit(treesha: string, parents: list of string, path: string): string
 commitbuf(commitmsg: string): string
 {
 	commitlen := int2string(len commitmsg);
+	cmbuf := array of byte commitmsg;
 
 	#6 - "commit", 1 - " ", 1 - '\0'
-	buf := array[6 + 1 + len commitlen + 1 + len commitmsg] of byte;
+	buf := array[6 + 1 + len commitlen + 1 + len cmbuf] of byte;
 
-	buf[:] = sys->aprint("commit %d", len commitmsg);
+	buf[:] = sys->aprint("commit %d", len cmbuf);
 	buf[7 + len commitlen] = byte 0;
-	buf[7 + len commitlen + 1:] = array of byte commitmsg;
+	buf[7 + len commitlen + 1:] = array of byte cmbuf;
 
 
 	ch := chan of (int, array of byte);
