@@ -816,6 +816,16 @@ mainloop:
 					if (m.stat.name == "commit"){
 						treesha1 := writetree(index);
 						ch := child(parent, "commit_msg");
+						commitfile := ch.object.sha1;
+						if(ch.object.otype != "work"){
+							newname := sprint("commit_msg%bd", ch.path);
+							path := mktempfile(newname);
+							fd := sys->open(path, Sys->OWRITE);
+							(nil, nil, filebuf) := utils->readsha1file(ch.object.sha1);
+							sys->write(fd, filebuf, len filebuf);
+							ch.object.otype = "work";
+							ch.object.sha1 = path;
+						}
 						sha1 := committree->commit(treesha1, parent.object.sha1 :: nil, ch.object.sha1);
 						sys->print("commited to: %s\n", sha1);
 						dirstat := sys->stat(pathmod->string2path(sha1)).t1;
