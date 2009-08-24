@@ -138,14 +138,14 @@ strchr(s: string, ch: int): int
 	return -1;
 }
 
-objectexists(name: string): int
+objectstat(name: string): (int, Sys->Dir)
 {
-	sys->print("OOOOO\n");
-	(ret, nil) := sys->stat(string2path(name));
-	if(ret == -1 && !packmod->exists(name)){
-		return 0;
+	(ret, dirstat) := sys->stat(string2path(name));
+	if(ret == -1){
+		return packmod->stat(name);
 	}
-	return 1;
+
+	return (ret, dirstat);
 }
 
 

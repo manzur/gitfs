@@ -55,7 +55,7 @@ Utils: module
 	copyarray:     fn(dst: array of byte, doffset: int, src: array of byte, soffset, count : int);
 	cutprefix:     fn(prefix, s: string): string;
 
-	objectexists:  fn(name: string): int;
+	objectstat:    fn(name: string): (int, Sys->Dir);
 	equalqids:     fn(q1,q2: Sys->Qid): int;
 	extractfile:   fn(shafilename: string): string;
 	equalshas:     fn(sha1, sha2: array of byte): int;

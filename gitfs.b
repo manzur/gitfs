@@ -352,7 +352,7 @@ initmodules()
 	configmod->init(mods);
 	gitindex->init(mods);
 	log->init(mods);
-	#packmod->init(mods);
+	packmod->init(mods);
 	pathmod->init(mods);
 	repo->init(mods);
 	treemod->init(mods);
@@ -378,9 +378,10 @@ inittable()
 	heads = heads1 := mergelist(l1, l2);
 	while(heads1 != nil){
 		head := hd heads1;
-		if(!utils->objectexists(head.sha1)){
+		(ret, dirstat) = utils->objectstat(head.sha1);
+		if(ret == -1){
 			error(sprint("head %s couldn't be accessed\n", string2path(head.sha1)));
-			heads1 = tl heads;
+			heads1 = tl heads1;
 			continue;
 		}
 		q := QMax++;
@@ -521,7 +522,6 @@ mergelist(l1, l2: list of ref Head): list of ref Head
 		elem := hd l1;
 		l := l1;
 		while(l != nil){
-			sys->print("l=nil?%d\n", l == nil);
 			if((hd l).name == elem.name) break;
 			l = tl l;
 		}
@@ -1050,7 +1050,6 @@ readpackedheads(): list of ref Head
 			l = head :: l;
 		}
 	}
-	sys->print("l is nil?%d\n", l == nil);
 	return l;
 }
 

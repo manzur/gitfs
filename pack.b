@@ -35,31 +35,33 @@ init(m: Mods)
 	entries = Table[list of ref Indexentry].new(37, nil);
 	readindexfiles(repopath + ".git/objects/pack");
 	sys->print("%d pack files were read\n", indexcount);
-	printallentries();
 }
 
 exists(sha1file: string): int
 {
-	sys->print("UUUUU\n");
 	sha1 := utils->string2sha(sha1file);
 	h := hash(sha1);
 	l := entries.find(h);
-	sys->print("entries cnt: %d/%d\n", len l, len entries.all());
-	pp := entries.all();
-	while(pp != nil){
-		list1 := hd pp;
-		while(list1 != nil){
-			sys->print("sha1: %s\n", sha2string((hd list1).sha1));
-			list1 = tl list1;
-		}
-		pp = tl pp;
-	}
 	while(l != nil){
 		if(eqarray((hd l).sha1, sha1))
 			return 1;
 		l = tl l;
 	}
 	return 0;
+}
+
+stat(sha1file: string): (int, Sys->Dir)
+{
+	sha1 := utils->string2sha(sha1file);
+	h := hash(sha1);
+	l := entries.find(h);
+	while(l != nil){
+		if(eqarray((hd l).sha1, sha1)){
+			return sys->stat((hd l).packfile);
+		}
+		l = tl l;
+	}
+	return (-1, Sys->nulldir);
 }
 
 readpackedobject(sha1: string): (string, int, array of byte)
@@ -70,7 +72,6 @@ readpackedobject(sha1: string): (string, int, array of byte)
 		return (nil, 0, nil);
 	}
 	
-
 	(s, l, buf) := readbyoffset(elem.packfile, elem.offset);
 	return (origintype, l, buf);
 }
@@ -199,12 +200,10 @@ process(path: string)
 	}
 
 	state = read(fd, buf, 20, state);
-
 	#reading sha1 
 	sys->read(fd, buf, 20);
 	sha1 := array[20] of byte;
 	sha1finish(fd, sha1, state);
-
 
 	#FIXME: add code for checking sha1 correctness
 }
@@ -261,7 +260,6 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 	#extracting type of the sha1
 	t := (b0 & 16r70) >> 4;
 	size := b0 & 16r0f;
-
 	if(b0 & 16r80){
 		shift := 4;
 		do{
