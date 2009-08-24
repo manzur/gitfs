@@ -285,7 +285,7 @@ writeindex(index:ref Index): int
 #return: number of elements written to the index file
 writeindexto(index:ref Index, path : string) : int
 {
-	fd := sys->open(path, Sys->OWRITE);
+	fd := sys->create(path, Sys->OWRITE, 8r644);
 	if(fd == nil){
 		error(sprint("write index error: %r\n"));
 		return 0;

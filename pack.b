@@ -28,6 +28,7 @@ imagic := array[4] of {byte 16rff, byte 16r74, byte 16r4f, byte 16r63};
 pmagic := array[4] of {byte 16r50, byte 16r41, byte 16r43, byte 16r4b};
 
 indexcount := 0;
+origintype: string;
 init(m: Mods)
 {
 	mods = m;
@@ -63,15 +64,15 @@ exists(sha1file: string): int
 
 readpackedobject(sha1: string): (string, int, array of byte)
 {
-	sys->print("Yeah, I'm here!\n");
 	(ret, elem) := search(str2sha1(sha1));
 	if(ret == -1){ 
 		sys->fprint(sys->fildes(2), "there's no such sha1: %s\n", sha1);
 		return (nil, 0, nil);
 	}
 	
-	sys->print("offset=>%bd\n", elem.offset);
-	return readbyoffset(elem.packfile, elem.offset);
+
+	(s, l, buf) := readbyoffset(elem.packfile, elem.offset);
+	return (origintype, l, buf);
 }
 
 readindexfiles(path: string)
@@ -102,7 +103,7 @@ printallentries()
 
 process(path: string)
 {
-	sys->print("pack/process: %s\n", path);
+	sys->print("processing %s\n", path);
 	version := 1;
 	buf := array[Sys->ATOMICIO] of byte;
 	fd := sys->open(path, Sys->OREAD);
@@ -145,7 +146,6 @@ process(path: string)
 	state = read(fd, buf, 4, state);
 	total := bytes2int(buf, 0, 4);
 	
-	sys->print("Version: %d; total %d\n", version, total);
 	if(version == 1){
 		for(i := 1; i <= total; i++){
 			state = read(fd, buf, 4, state);
@@ -199,15 +199,12 @@ process(path: string)
 	}
 
 	state = read(fd, buf, 20, state);
-	sys->print("packs sha1:%s\n", sha2string(buf[:20]));
 
 	#reading sha1 
 	sys->read(fd, buf, 20);
 	sha1 := array[20] of byte;
 	sha1finish(fd, sha1, state);
 
-	sys->print("sha1: %s\n", sha2string(buf[:20]));
-	sys->print("real sha1: %s\n", sha2string(sha1));
 
 	#FIXME: add code for checking sha1 correctness
 }
@@ -264,24 +261,19 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 	#extracting type of the sha1
 	t := (b0 & 16r70) >> 4;
 	size := b0 & 16r0f;
-	sys->print("b is %x; size is %d\n", int b0, size);
 
-	sys->fprint(sys->fildes(2), "==>%d ", int b0);
 	if(b0 & 16r80){
 		shift := 4;
 		do{
 			if(sys->read(packfd, b, len b) != len b)
 				break;
 			b0 = int b[0];
-			sys->fprint(sys->fildes(2), "==>%d ", int b0);
 			size += (b0 & 16r7f ) << shift;
 			shift += 7;
 		}while(b0 & 16r80);
 	}
 
 	unpacked: array of byte;
-	sys->print("TYPE: %s\n", typefromint(t));
-	sys->print("size is %d\n", size);
 	if(t == 6){
 		#OFS_DELTA
 		sys->read(packfd, b, 1);
@@ -300,13 +292,13 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 		#OFS_REF_DELTA
 		sh := array[20] of byte;
 		sys->read(packfd, sh, len sh);
-		sys->print("base sha1: %s\n", sha2string(sh));
 		delta := unpack(packfd, size);
 		basebuf := readpackedobject(sha2string(sh)).t2;
 		unpacked = patch(basebuf, delta);	
 	}
 	else{
 		unpacked = unpack(packfd, size);
+		origintype = typefromint(t);
 	}
 
 	return (typefromint(t), size, unpacked);
@@ -345,7 +337,6 @@ patch(basebuf, delta: array of byte): array of byte
 	while(i < len delta){
 		b0 := int delta[i++];
 		if(b0 & 16r80){
-			sys->print("cmd is copy\n");
 			off := sz := 0;
 			if(b0 & 16r01) off = int delta[i++];
 			if(b0 & 16r02) off |= int delta[i++] << 8;
@@ -363,7 +354,6 @@ patch(basebuf, delta: array of byte): array of byte
 			size -= sz;
 		}
 		else if (b0){
-			sys->print("no cmd; size is %d\n", b0);
 			if(b0 + i > len delta){
 				sys->fprint(sys->fildes(2), "size of chunk exceeds overall size\n");
 				break;	
@@ -390,7 +380,6 @@ mainloop:
 		pick rq := <-rqchan
 		{
 			Finished => if(len rq.buf > 0){ 
-					sys->print("Data remained:%r\n");
 					sys->seek(fd, big -len rq.buf, Sys->SEEKRELA);
 				    }
 				    break mainloop;
@@ -449,7 +438,6 @@ search(sha1: array of byte): (int, ref Indexentry)
 	}
 	
 	if(elem != nil){
-		sys->print("mega offseT: %bd\n", elem.offset);
 		return (0, elem);
 	}
 
