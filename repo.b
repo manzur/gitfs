@@ -13,7 +13,7 @@ indexpath, gitfsindexpath: string;
 init(m: Mods)
 {
 	mods = m;
-	sys->print("repopath is %s\n", repopath);
+#	sys->print("repopath is %s\n", repopath);
 	indexpath = repopath + ".git/index";
 	gitfsindexpath = repopath + ".git/gitfsindex";
 }
@@ -78,6 +78,7 @@ convertindex(): int
 	sys->write(fd, int2bytes(signature), INTSZ);
 	sys->write(fd, int2bytes(version), INTSZ);
 	sys->write(fd, int2bytes(entriescnt), INTSZ);
+
 	for(i := 0; i < entriescnt; i++){
 		#skiping all information until sha1
 		sys->seek(indexfd, big 40, Sys->SEEKRELA);

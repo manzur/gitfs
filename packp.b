@@ -164,6 +164,7 @@ process(path: string)
 		}
 	}
 	else {
+		sys->print("mega bookmark\n");
 		#absolute offsets for sha1, crc32, offset tables
 		#sha1off := sys->seek(fd, big 0, Sys->SEEKRELA); 
 		#crcoff := sys->seek(fd, big (total * 20), Sys->SEEKRELA);
@@ -185,6 +186,7 @@ process(path: string)
 			crc32 := bytes2int(buf, 0, 4);
 			entry := hd l1;
 			entry.crc32 = crc32;
+			sys->print("crc for %s is %d\n", utils->sha2string(entry.sha1), crc32);
 			l = entry :: l;
 		}
 		l1 = l;

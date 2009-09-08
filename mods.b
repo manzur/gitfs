@@ -6,6 +6,9 @@ include "sys.m";
 include "bufio.m";
 Iobuf: import bufio;
 
+include "crc.m";
+CRCstate: import crcmod;
+
 include "daytime.m";
 include "draw.m";
 include "env.m";
@@ -50,6 +53,7 @@ init(path: string, deb: int)
 	#sys modules load
 	sys = load Sys Sys->PATH;
 	bufio = load Bufio Bufio->PATH;
+	crcmod = load Crc Crc->PATH;
 	daytime = load Daytime Daytime->PATH;
 	deflatefilter = load Filter Filter->DEFLATEPATH;
 	env = load Env Env->PATH;

@@ -2,6 +2,7 @@
 #System modules 
 include "sys.m";
 include "bufio.m";
+include "crc.m";
 include "daytime.m";
 include "draw.m";
 include "env.m";
@@ -15,9 +16,10 @@ include "styx.m";
 include "styxservers.m";
 include "workdir.m";
 
-sys, bufio, daytime, draw, deflatefilter, env, gwd, inflatefilter, keyring, lists, readdir, tables, stringmod, styx, styxservers: import mods; 
+sys, bufio, crcmod, daytime, draw, deflatefilter, env, gwd, inflatefilter, keyring, lists, readdir, tables, stringmod, styx, styxservers: import mods; 
 
 Iobuf: import bufio;
+CRCstate: import crcmod;
 Table, Strhash: import tables;
 
 #Gitfs modules

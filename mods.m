@@ -5,6 +5,7 @@ Mods: module
 
 	sys: Sys;
 	bufio: Bufio;
+	crcmod: Crc;
 	daytime: Daytime;
 	draw: Draw;
 	deflatefilter: Filter;

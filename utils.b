@@ -332,7 +332,6 @@ bytes2big(buf: array of byte, offset: int): big
 {
 	return (big bytes2int(buf, offset) << (INTSZ * 8)) |
 		(big bytes2int(buf,offset + INTSZ));
-
 }
 
 big2bytes(n: big): array of byte
@@ -613,7 +612,7 @@ readint(fd: ref Sys->FD): int
 
 	ret := 0;
 	for(i := 0; i < len buf; i++){
-		ret = ret * 10 + int buf[i];
+		ret = ret * 256 + int buf[i];
 	}
 
 	return ret;

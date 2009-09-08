@@ -191,6 +191,7 @@ readindexfrom(index:ref Index, path : string) : int
 
 	index.header = Header.unpack(header);
 
+	sys->print("Entries cnt: %d\n", index.header.entriescnt);
 	state: ref Keyring->DigestState = nil;
 	keyring->sha1(header, len header, nil, state);
 

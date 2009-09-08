@@ -1036,7 +1036,7 @@ readpackedheads(): list of ref Head
 {
 	l: list of ref Head;
 	ibuf := bufio->open(repopath + ".git/packed-refs", Sys->OREAD);
-	sys->print("path==%s\n", repopath + "packed-refs");
+#	sys->print("path==%s\n", repopath + "packed-refs");
 	if(ibuf != nil){
 		while((s := ibuf.gets('\n')) != nil){
 #FIXME: should add code for processing packed-refs traits

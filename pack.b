@@ -16,7 +16,7 @@ Packfile: adt{
 
 Indexentry: adt{
 	offset: big;
-	crc32: int;
+	crc32: big;
 	sha1: array of byte;
 	packfile: string;
 };
@@ -64,6 +64,13 @@ stat(sha1file: string): (int, Sys->Dir)
 	return (-1, Sys->nulldir);
 }
 
+int2big(num: int): big
+{
+	r: big;
+	r = big ((big ((num >> 16) & 16rffff)) << 16) | (big (num & 16rffff));
+	return r;
+}
+
 readpackedobject(sha1: string): (string, int, array of byte)
 {
 	(ret, elem) := search(str2sha1(sha1));
@@ -72,7 +79,11 @@ readpackedobject(sha1: string): (string, int, array of byte)
 		return (nil, 0, nil);
 	}
 	
-	(s, l, buf) := readbyoffset(elem.packfile, elem.offset);
+	(s, l, buf, realcrc) := readbyoffset(elem.packfile, elem.offset);
+	if(realcrc != elem.crc32){
+		return (origintype, l, nil);
+	}
+
 	return (origintype, l, buf);
 }
 
@@ -146,13 +157,14 @@ process(path: string)
 	#reading total count of the entries
 	state = read(fd, buf, 4, state);
 	total := bytes2int(buf, 0, 4);
+
 	
 	if(version == 1){
 		for(i := 1; i <= total; i++){
 			state = read(fd, buf, 4, state);
 			offset := bytes2int(buf, 0, 4);
 			state = read(fd, buf, 20, state);
-			entry := ref Indexentry(big offset, 0, buf[:20], packpath);
+			entry := ref Indexentry(big offset, big 0, buf[:20], packpath);
 			addentry(entry);
 		}
 	}
@@ -162,40 +174,26 @@ process(path: string)
 		#crcoff := sys->seek(fd, big (total * 20), Sys->SEEKRELA);
 		#offoff := sys->seek(fd, big (total * 4), Sys->SEEKRELA);
 		
-		l: list of ref Indexentry = nil;
-		for(i := 0; i < total; i++){
+		arr := array[total] of ref Indexentry;
+		for(i = 0; i < total; i++){
 			state = read(fd, buf, 20, state);
 			sha1 := array[20] of byte;
 			sha1[:] = buf[:20];
-			#sys->print("===>sha1: %s\n", sha2string(sha1));
-			l = ref Indexentry(big 0, 0, sha1, packpath) :: l;
+			arr[i] = ref Indexentry(big 0, big 0, sha1, packpath);
 		}
 
-		l1 := l;
-		l = nil;
 		for(i = 0; i < total; i++){
 			state = read(fd, buf, 4, state);
-			crc32 := bytes2int(buf, 0, 4);
-			entry := hd l1;
-			entry.crc32 = crc32;
-			l = entry :: l;
-			l1 = tl l1;
+			arr[i].crc32 = bytes2big(buf, 0, 4);
 		}
-		l1 = l;
-		l = nil;
+		
 		for(i = 0; i < total; i++){	
 			state = read(fd, buf, 4, state);
-			offset := bytes2int(buf, 0, 4);
-			entry := hd l1;
-			entry.offset = big offset;
-			l = entry :: l;
-			l1 = tl l1;
+			arr[i].offset = bytes2big(buf, 0, 4);
 		}	
 		
-		while(l != nil){
-			entry := hd l;
-			addentry(entry);
-			l = tl l;
+		for(i = 0; i < total; i++){
+			addentry(arr[i]);
 		}
 	}
 
@@ -247,7 +245,7 @@ isindexfile(path: string): int
 	return 0;
 }
 
-readbyoffset(packpath: string, off: big): (string, int, array of byte)
+readbyoffset(packpath: string, off: big): (string, int, array of byte, big)
 {
 	packfd := sys->open(packpath, Sys->OREAD);
 
@@ -256,6 +254,8 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 	b := array[1] of byte;
 	sys->read(packfd, b, len b);
 	b0 := int b[0];
+	crcstate := crcmod->init(0, -1);
+	crcmod->crc(crcstate, b, len b); 
 
 	#extracting type of the sha1
 	t := (b0 & 16r70) >> 4;
@@ -265,6 +265,7 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 		do{
 			if(sys->read(packfd, b, len b) != len b)
 				break;
+			crcmod->crc(crcstate, b, len b);
 			b0 = int b[0];
 			size += (b0 & 16r7f ) << shift;
 			shift += 7;
@@ -275,14 +276,16 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 	if(t == 6){
 		#OFS_DELTA
 		sys->read(packfd, b, 1);
+		crcmod->crc(crcstate, b, 1);
 		offset := big (int b[0] & 127);
 		while(int b[0] & 16r80){
 			sys->read(packfd, b, 1);
+			crcmod->crc(crcstate, b, 1);
 			offset += big 1;
 			offset = (offset << 7) + big (int b[0] & 16r7f);
 		}
 		offset = off - offset;
-		delta := unpack(packfd, size);
+		delta := unpack(packfd, size, crcstate);
 		basebuf := readbyoffset(packpath, big offset).t2;
 		unpacked = patch(basebuf, delta);
 	}
@@ -290,16 +293,17 @@ readbyoffset(packpath: string, off: big): (string, int, array of byte)
 		#OFS_REF_DELTA
 		sh := array[20] of byte;
 		sys->read(packfd, sh, len sh);
-		delta := unpack(packfd, size);
+		crcmod->crc(crcstate, sh, len sh);
+		delta := unpack(packfd, size, crcstate);
 		basebuf := readpackedobject(sha2string(sh)).t2;
 		unpacked = patch(basebuf, delta);	
 	}
 	else{
-		unpacked = unpack(packfd, size);
+		unpacked = unpack(packfd, size, crcstate);
 		origintype = typefromint(t);
 	}
 
-	return (typefromint(t), size, unpacked);
+	return (typefromint(t), size, unpacked, int2big(crcstate.crc));
 }
 
 
@@ -366,13 +370,13 @@ patch(basebuf, delta: array of byte): array of byte
 	return output;
 }
 
-unpack(fd: ref Sys->FD, size: int): array of byte
+unpack(fd: ref Sys->FD, size: int, crcstate: ref CRCstate): array of byte
 {
 	rqchan := inflatefilter->start("z");
 	unpacked := array[size] of byte;
-	buf := array[Sys->ATOMICIO] of byte;
 	offset := 0;
 
+	off := sys->seek(fd, big 0, Sys->SEEKRELA);
 mainloop:
 	while(1){
 		pick rq := <-rqchan
@@ -395,6 +399,20 @@ mainloop:
 				return  nil;
 		}
 	}
+
+	#FIXME: make calculation of crc without rereading 
+	curroff := sys->seek(fd, big 0, Sys->SEEKRELA);
+	rest := curroff - off;
+	sys->seek(fd, off, Sys->SEEKSTART);
+	buf := array[Sys->ATOMICIO] of byte;
+	while(rest > big Sys->ATOMICIO){
+		cnt := sys->read(fd, buf, int rest);
+		rest -= big cnt;
+		crcmod->crc(crcstate, buf, cnt);
+	}
+	cnt := sys->read(fd, buf, int rest);
+	crcmod->crc(crcstate, buf, cnt);
+	sys->seek(fd, curroff, Sys->SEEKSTART);
 
 	return unpacked;
 }
@@ -473,6 +491,15 @@ bytes2int(a: array of byte, start, end: int): int
 	ret := 0;
 	for(i := start; i < end; i++){
 		ret = ret << 8 | int a[i];
+	}
+	return ret;
+}
+
+bytes2big(a: array of byte, start, end: int): big
+{
+	ret := big 0;
+	for(i := start; i < end; i++){
+		ret = ret << 8 | big a[i];
 	}
 	return ret;
 }
