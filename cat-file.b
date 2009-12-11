@@ -7,7 +7,7 @@ mods: Mods;
 include "modules.m";
 
 sprint: import sys;
-bytepos, error, sha2string, SHALEN: import utils;	
+bytepos, sha2string, SHALEN: import utils;	
 
 printtypeonly := 0;
 
@@ -16,12 +16,10 @@ init(m: Mods)
 	mods = m;
 }
 
-catfile(path: string, msgchan: chan of array of byte)
+catfile(sha1: string, msgchan: chan of array of byte)
 {
-	(filetype, nil, buf) := utils->readsha1file(path);	
-
-	str := "";
-	offset := 0;
+	str := ""; offset := 0;
+	(filetype, nil, buf) := utils->readsha1file(sha1);	
 	while(filetype == "tree" && (pos := bytepos(buf, offset, byte 0)) != -1){
 		pos++;
 		sha1 := buf[pos: pos + SHALEN];
@@ -29,16 +27,8 @@ catfile(path: string, msgchan: chan of array of byte)
 		str += " " + sha2string(sha1);
 		offset = pos + SHALEN;
 	}
-
 	if(filetype == "tree")
 		msgchan <-= sys->aprint("%s", str);
 	else 
 		msgchan <-= buf[:];
 }
-
-usage()
-{
-	sys->fprint(sys->fildes(2), "usage: cat-file <sha1>");
-	exit;
-}
-

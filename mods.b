@@ -15,6 +15,7 @@ include "env.m";
 include "filter.m";
 include "keyring.m";
 include "lists.m";
+include "names.m";
 include "readdir.m";
 
 include "gittables.m";
@@ -38,12 +39,9 @@ include "pack.m";
 include "path.m";
 include "repo.m";
 include "tree.m";
-include "read-tree.m";
 include "utils.m";
-include "write-tree.m";
 
 include "mods.m";
-
 
 init(path: string, deb: int)
 {
@@ -61,6 +59,7 @@ init(path: string, deb: int)
 	inflatefilter = load Filter Filter->INFLATEPATH;
 	keyring = load Keyring Keyring->PATH;
 	lists = load Lists Lists->PATH;
+	names = load Names Names->PATH;
 	readdir = load Readdir Readdir->PATH;
 	tables = load Tables Tables->PATH;
 	stringmod = load String String->PATH;
@@ -79,9 +78,7 @@ init(path: string, deb: int)
 	pathmod = load Pathmod Pathmod->PATH;
 	repo = load Repo Repo->PATH;
 	treemod = load Treemod Treemod->PATH;
-	readtreemod = load Readtree Readtree->PATH;
 	utils = load Utils Utils->PATH;
-	writetreemod = load Writetree Writetree->PATH;
 
 	#initializitions
 	deflatefilter->init();
@@ -125,8 +122,7 @@ resolvepath(curpath: string, path: string): string
 	if(path == ".")
 		return curpath;
 
-	if(path == "..")
-	{
+	if(path == ".."){
 		oldpath := gwd->init();
 		sys->chdir(curpath);
 		sys->chdir("..");

@@ -38,7 +38,6 @@ insertbydate(commits: list of ref Commit, commit: ref Commit): list of ref Commi
 	}
 	if(commits == nil || commit.sha1 != (hd commits).sha1)
 		l = commit :: l;
-
 	l = lists->concat(lists->reverse(l), commits);
 
 	return l;
@@ -90,17 +89,14 @@ getcommits(parents: list of ref Commit)
 showlog(commit: ref Commit)
 {
 	getcommits(commit :: nil);
-
 	commits = lists->reverse(commits);
 	commits = commit :: commits;
-
 	while(commits != nil){
 		commit = hd commits;
 		msgchan <-= sys->aprint("Commit: %s\n", commit.sha1);
 		msgchan <-= sys->aprint("%s\n", dateformatconv(commit.author));
 	        msgchan <-= sys->aprint("%s\n", dateformatconv(commit.committer));
 	        msgchan <-= sys->aprint("%s\n\n", commit.comment);
-
 		commits = tl commits;
 	}
 	msgchan <-= nil;

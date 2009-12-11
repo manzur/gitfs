@@ -6,15 +6,14 @@ include "mods.m";
 
 sprint: import sys;
 
+readcommit: import commitmod;
 dirname, makeabsentdirs: import pathmod;	
+readtree: import treemod;
 
 QIDSZ, BIGSZ, INTSZ, SHALEN: import utils;
-bytes2int, comparebytes, debugmsg, error, ntohl, htonl,int2bytes, filesha1, allocnr, mergesort, packqid, sha2string, unpackqid, equalshas: import utils;
-
-filebuf: array of byte;
+bytes2int, comparebytes, debugmsg, error, isunixdir, ntohl, htonl,int2bytes, filesha1, allocnr, mergesort, objectstat, packqid, sha2string, string2sha, unpackqid, equalshas: import utils;
 
 indexpath: string;
-
 mods: Mods;
 
 Index.new(arglist: list of string, debug: int): ref Index
@@ -31,51 +30,29 @@ init(m: Mods)
 initindex(): Index
 {
 	index: Index;
-	index.header = Header.new();
-	index.hashcap = 37;
-	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
+        index.header = Header.new();
+        index.hashcap = 37;
+        index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
 	return index;
 }
 
-#FIXME: Use addentry
 Index.addfile(index: self ref Index, path : string): string 
 {
-#no need for verification
-#	if(!verifypath(mntpt + path)){
-#		error(sprint("wrong path: %r\n"));
-#		return -1;
-#	}
 	#FIXME: Exclude code should be modified to be specific for each branch
 #	if(exclude->excluded(path)) return -1;
 
-	index.header.entriescnt++;
-	if(index.header.entriescnt * CLSBND >= index.hashcap){
-		oldentries := index.entries.all();
-		index.hashcap = allocnr(index.hashcap);
-		index.entries = Strhash[ref Entry].new(index.hashcap, nil);
-
-		while(oldentries != nil){
-			entry := hd oldentries;
-			index.entries.add(entry.name, entry);
-			oldentries = tl oldentries;
-		}
-	}
-
+	#Create a blob file
 	fullpath := repopath + getentrypath(path);
 	makeabsentdirs(dirname(fullpath));
 	sha1 := writeblobfile(fullpath);
 
 	#only path from master/tree is needed
+	#Create entry in the file system hierarchy
 	entry := initentry(getentrypath(path));
-	sys->print("adding entry(%s) with name %s to %s\n", fullpath, entry.name, sha2string(sha1));
 	entry.sha1 = sha1;
-	if((elem := index.entries.find(entry.name)) != nil){
-		copyentry(elem, entry);
-		index.header.entriescnt--;
-	}
-	else
-		index.entries.add(entry.name, entry);
+	index.addentry(entry);
+	sys->print("adding entry(%s) with name %s to %s\n", fullpath, entry.name, sha2string(sha1));
 
 	return sha2string(entry.sha1);
 }
@@ -91,8 +68,7 @@ writeblobfile(path: string): array of byte
 
 	buf := array[Sys->ATOMICIO] of byte;
 	ch := chan of (int, array of byte);
-	sha1: array of byte;
-	sz: int;
+	sha1: array of byte; sz: int;
 	
 	spawn utils->writesha1file(ch);
 	temp := sys->aprint("blob %bd", dirstat.length);
@@ -119,7 +95,6 @@ Index.removeentries(index: self ref Index): ref Index
 getentrypath(path: string): string
 {
 	#FIXME: code should take into account commit tags, and dirs named tree
-
 	sep := "/tree/";
 	(s1, s2) := stringmod->splitstrr(path, sep); 
 
@@ -128,19 +103,26 @@ getentrypath(path: string): string
 
 Index.addentry(index: self ref Index, entry: ref Entry)
 {
+	#Resize the index table size
 	index.header.entriescnt++;
 	if(index.header.entriescnt * CLSBND >= index.hashcap){
 		oldentries := index.entries.all();
 		index.hashcap = allocnr(index.hashcap);
 		index.entries = Strhash[ref Entry].new(index.hashcap, nil);
 
+		#Copy old entries 
 		while(oldentries != nil){
 			entry := hd oldentries;
 			index.entries.add(entry.name, entry);
 			oldentries = tl oldentries;
 		}
 	}
-	index.entries.add(entry.name, entry);
+	if((elem := index.entries.find(entry.name)) != nil){
+		copyentry(elem, entry);
+		index.header.entriescnt--;
+	}
+	else
+		index.entries.add(entry.name, entry);
 }
 
 Index.rmfile(index: self ref Index, path : string) 
@@ -155,42 +137,67 @@ Index.rmfile(index: self ref Index, path : string)
 
 Header.new(): ref Header
 {
-	header: Header;
-	header.signature = CACHESIGNATURE;
-	header.version   = 2;
-	header.entriescnt = 0;
-
-	return ref header;
+	return ref Header(CACHESIGNATURE, 2, 0);
 }
 
-readindex(index:ref Index): int
+readindex(index: ref Index): int
 {
 	return readindexfrom(index, indexpath);
 }
 
+readindexfromsha1(sha1: string): Index
+{
+	commit := readcommit(sha1);	
+	header := Header(0, 0, 0);
+	index := Index(ref header, nil, 0);
+#FIXME: index.hashcap should be dependable on entries count, not a constant
+	index.hashcap = 37 * CLSBND * 2;
+	index.entries = Strhash[ref Entry].new(index.hashcap, nil);
+	count := fillindexfromtree(ref index, commit.treesha1, "");
+	index.header.entriescnt = count;
+
+	return index;
+}
+
+fillindexfromtree(index: ref Index, treesha1, basename: string): int
+{
+	count := 0;
+	tree := readtree(treesha1);
+	while(tree.children != nil){
+		(mode, name, elemsha1) := hd tree.children;
+		tree.children = tl tree.children;
+		if(isunixdir(mode)){
+			sys->print("UNIX dir: %s\n", name);
+			count += fillindexfromtree(index, elemsha1, name + "/");
+			continue;
+		}
+		sys->print("elem sha1: %s\n", elemsha1);
+		(ret, dirstat) := objectstat(elemsha1); 
+		entry := ref Entry(dirstat.qid, string2sha(elemsha1), len name, basename + name);
+		index.entries.add(entry.name, entry);
+		count++;
+	}
+
+	return count;
+}
 
 #return: number of elements read from index file
 readindexfrom(index:ref Index, path : string) : int
 {
 	indexfd := sys->open(indexpath, Sys->OREAD);
-
 	if(indexfd == nil){
 		error(sprint("file access error: %r\n"));
 		return -1;
 	}
 
 	header := array[HEADERSZ] of byte;
-
 	#skiping sha1 of the git index
 	sys->seek(indexfd, big SHALEN, Sys->SEEKSTART);
-
 	if((ret := sys->read(indexfd, header, HEADERSZ)) != HEADERSZ){
 		error(sprint("Index format error: %r\n"));
 		return -1;
 	}
-
 	index.header = Header.unpack(header);
-
 	sys->print("Entries cnt: %d\n", index.header.entriescnt);
 	state: ref Keyring->DigestState = nil;
 	keyring->sha1(header, len header, nil, state);
@@ -205,7 +212,6 @@ readindexfrom(index:ref Index, path : string) : int
 			error(sprint("index file error: %r\n"));
 			return 0;
 		}
-
 		state = keyring->sha1(entrybuf, len entrybuf, nil, state);
 		entry := Entry.unpack(entrybuf); 
 		namelen := entry.flags & 16r0fff;
@@ -214,7 +220,6 @@ readindexfrom(index:ref Index, path : string) : int
 		entry.name = string namebuf;	
 		index.entries.add(entry.name, entry);
 		state = keyring->sha1(namebuf, len namebuf, nil, state);
-
 	}
 
 	sha1 := array[SHALEN] of byte;
@@ -274,7 +279,7 @@ unlock()
 	sys->remove(repopath + ".git/index.lock");
 }
 
-writeindex(index:ref Index): int
+writeindex(index: ref Index): int
 {
 	if(!lock())
 		return 0;
@@ -284,7 +289,7 @@ writeindex(index:ref Index): int
 }
 
 #return: number of elements written to the index file
-writeindexto(index:ref Index, path : string) : int
+writeindexto(index:ref Index, path: string): int
 {
 	fd := sys->create(path, Sys->OWRITE, 8r644);
 	if(fd == nil){
@@ -294,7 +299,6 @@ writeindexto(index:ref Index, path : string) : int
 
 	#skiping sha1 of the git's index file
 	sys->seek(fd, big SHALEN, Sys->SEEKSTART);
-
 	state: ref Keyring->DigestState = nil;
 	entries := index.entries.all();
 	index.header.signature = CACHESIGNATURE; 
@@ -305,10 +309,8 @@ writeindexto(index:ref Index, path : string) : int
 	#FIXME: header entriescnt and len entries.all should equal
 	sys->write(fd, header, len header);
 
-	cnt := 0;
-	entrybuf: array of byte;
-	for(l := mergesort(entries); l != nil; l = tl l)
-	{
+	cnt := 0; entrybuf: array of byte;
+	for(l := mergesort(entries); l != nil; l = tl l) {
 		entrybuf = (hd l).pack();
 		cnt := sys->write(fd, entrybuf, len entrybuf);
 		if(cnt != len entrybuf){
@@ -316,9 +318,7 @@ writeindexto(index:ref Index, path : string) : int
 			return cnt;
 		}
 		keyring->sha1(entrybuf, len entrybuf, nil, state);
-
 	}
-
 	sha1 := array[SHALEN] of byte;
 	keyring->sha1(nil, 0, sha1, state);
 	sys->write(fd, sha1, len sha1);
@@ -326,23 +326,23 @@ writeindexto(index:ref Index, path : string) : int
 	return index.header.entriescnt;
 }
 
-Header.unpack(buf : array of byte) : ref Header
+Header.unpack(buf: array of byte): ref Header
 {
-	ret : Header;
+	ret: Header;
 
 	ret.signature = bytes2int(buf, 0);
 	offset := INTSZ;
 
-	ret.version = bytes2int(buf,offset);
+	ret.version = bytes2int(buf, offset);
 	offset += INTSZ;
 	
-	ret.entriescnt = bytes2int(buf,offset);
+	ret.entriescnt = bytes2int(buf, offset);
 	offset += INTSZ;
 	
 	return ref ret;
 }
 
-Header.pack(header : self ref Header) : array of byte
+Header.pack(header: self ref Header): array of byte
 {
 	ret := array[HEADERSZ] of byte;
 
@@ -359,9 +359,8 @@ Header.pack(header : self ref Header) : array of byte
 
 Entry.pack(entry : self ref Entry) : array of byte
 {
-	ret := array[ENTRYSZ + len entry.name] of byte;
-
 	offset := 0;
+	ret := array[ENTRYSZ + len entry.name] of byte;
 
 	temp := packqid(ref entry.qid);
 	ret[:] = temp;
@@ -380,44 +379,37 @@ Entry.pack(entry : self ref Entry) : array of byte
 
 Entry.unpack(buf : array of byte) : ref Entry
 {
-	entry: Entry;
-
-	offset := 0;
+	entry: Entry; offset := 0;
 
 	entry.qid = unpackqid(buf, offset);
 	offset += QIDSZ;
 
-	entry.sha1 = buf[offset : offset + SHALEN];
+	entry.sha1 = buf[offset:offset + SHALEN];
 	offset += SHALEN;
 
 	entry.flags = bytes2int(buf, offset);
 	offset += INTSZ;
 
-#FIXME: read also entry.name
 	return ref entry;
 }
 
 
 initentry(filename: string): ref Entry
 {
-	entry: Entry;
-
 	(retval, dirstat) := sys->stat(repopath + filename);
-	if(retval != 0)
-	{
+	if(retval != 0){
 		error(sprint("stat error: %r\n"));
 		return nil;
 	}
+	entry: Entry;
+        entry.qid = dirstat.qid;
+        entry.name = filename;
+        entry.flags = len filename & 16r0fff;
 	
-	entry.qid = dirstat.qid;
-	entry.name = filename;
-	entry.flags = len filename & 16r0fff;
-
 	return ref entry;
 }
 
-
-verifypath(path : string) : int
+verifypath(path: string): int
 {
 	return !sys->stat(path).t0;
 }
@@ -425,7 +417,6 @@ verifypath(path : string) : int
 verifyheader(header: ref Header, sha1: array of byte): int
 {
 	return 1;
-
 #	return  equalshas(header.sha1, sha1) &&	
 #		header.signature == CACHESIGNATURE &&
 #		header.version == 1 &&
@@ -462,7 +453,7 @@ Entry.compare(e1: self ref Entry, e2: ref Entry): int
 Entry.new(): ref Entry
 {
 	entry: Entry;
-	entry.qid = Sys->Qid(big 0,0,0);
+	entry.qid = Sys->Qid(big 0, 0, 0);
 	entry.sha1 = array[SHALEN] of byte;
 	entry.flags = 0;
 	entry.name = "";
@@ -470,3 +461,11 @@ Entry.new(): ref Entry
 	return ref entry;
 }
 
+printindex(index: ref Index)
+{
+	entries := index.entries.all();
+	while(entries != nil){
+		sys->print("Entry name: %s\n", (hd entries).name);
+		entries = tl entries;
+	}
+}

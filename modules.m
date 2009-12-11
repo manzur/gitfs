@@ -9,6 +9,7 @@ include "env.m";
 include "filter.m";
 include "keyring.m";
 include "lists.m";
+include "names.m";
 include "readdir.m";
 include "gittables.m";
 include "string.m";
@@ -16,7 +17,7 @@ include "styx.m";
 include "styxservers.m";
 include "workdir.m";
 
-sys, bufio, crcmod, daytime, draw, deflatefilter, env, gwd, inflatefilter, keyring, lists, readdir, tables, stringmod, styx, styxservers: import mods; 
+sys, bufio, crcmod, daytime, draw, deflatefilter, env, gwd, inflatefilter, keyring, lists, names, readdir, tables, stringmod, styx, styxservers: import mods; 
 
 Iobuf: import bufio;
 CRCstate: import crcmod;
@@ -34,10 +35,8 @@ include "pack.m";
 include "path.m";
 include "repo.m";
 include "tree.m";
-include "read-tree.m";
 include "utils.m";
-include "write-tree.m";
 
-catfilemod, checkoutmod, commitmod, committree, configmod, gitindex, log, packmod, pathmod, repo, treemod, readtreemod, utils, writetreemod: import mods;
+catfilemod, checkoutmod, commitmod, committree, configmod, gitindex, log, packmod, pathmod, repo, treemod, utils: import mods;
+repopath, shatable: import  mods;
 
-index, repopath, shatable: import  mods;

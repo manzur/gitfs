@@ -48,6 +48,7 @@ Utils: module
 	ntohs: 	       fn(n: int): int;
 	ntohl:	       fn(n: int): int;
 	ntohb: 	       fn(b: big): big;
+	sizeofrest:    fn(fd: ref Sys->FD): big;
 
 	packqid:       fn(qid: ref Sys->Qid): array of byte;
 	unpackqid:     fn(buf: array of byte, offset: int): Sys->Qid;
@@ -65,10 +66,10 @@ Utils: module
 	strip:         fn(s: string): string;
 	splitl:        fn(s: string, sep: string, count: int): (string, string);
 
-	readline:      fn(ibuf: ref Bufio->Iobuf): string;
 	getline:       fn(fd: ref Sys->FD): string;
+	readline:      fn(ibuf: ref Bufio->Iobuf): string;
 
-	isunixdir:         fn(mode: int): int;
+	isunixdir:     fn(mode: int): int;
 	bytepos:       fn(a: array of byte, offset: int, delim: byte): int; 
 
 	error:	       fn(msg: string);

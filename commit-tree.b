@@ -6,6 +6,7 @@ include "modules.m";
 
 sprint: import sys;
 error, int2string, readline, sha2string: import utils;
+dirname: import pathmod;
 
 MAXUSERLEN: con 128;
 
@@ -58,9 +59,14 @@ commit(treesha: string, parents: list of string, path: string): string
 			}
 		}
 	}
+	authorfd := sys->open(dirname(path) + "/author", Sys->OREAD);
+	if(authorfd != nil){
+		buf := array[MAXUSERLEN] of byte;
+		sys->read(authorfd, buf, len buf);
+		author = string buf;
+	}
 
 	#reading comments field
-
 	comments += ibuf.gets(-1);		
 
 	if(author == nil){
@@ -77,8 +83,8 @@ commit(treesha: string, parents: list of string, path: string): string
 
 commitbuf(commitmsg: string): string
 {
-	commitlen := int2string(len commitmsg);
 	cmbuf := array of byte commitmsg;
+	commitlen := int2string(len commitmsg);
 
 	#6 - "commit", 1 - " ", 1 - '\0'
 	buf := array[6 + 1 + len commitlen + 1 + len cmbuf] of byte;
@@ -88,18 +94,16 @@ commitbuf(commitmsg: string): string
 	buf[7 + len commitlen + 1:] = array of byte cmbuf;
 
 
+	sha: array of byte; sz: int;
 	ch := chan of (int, array of byte);
 	spawn utils->writesha1file(ch);
-	sha: array of byte;
-	sz: int;
 	ch <-= (len buf, buf);
 	ch <-= (0, buf);
 	(sz, sha) = <-ch;
 
-	fd := sys->create(repopath + "head", Sys->OWRITE, 8r644);
-	
+	#update HEAD-file
+	fd := sys->create(repopath + ".git/HEAD", Sys->OWRITE, 8r644);
 	ret := sha2string(sha);
-
 	sys->fprint(fd, "%s", ret);
 
 	return ret;
@@ -130,21 +134,12 @@ getcommitterinfo(): string
 {
 	name := configmod->getstring("user.name");
 	mail := configmod->getstring("user.email");
-	s: string;
-	if((s = env->getenv("GIT_COMMITTER_NAME")) != nil){
-		name = utils->strip(s);
-	}
-	if((s = env->getenv("GIT_COMMITTER_MAIL")) != nil){
-		mail = utils->strip(s);
-	}
-
 	if(name == nil){
 		name = configmod->getstring("committername"); 
 	}
 	if(mail == nil){
 		mail = configmod->getstring("committermail");
 	}
-
 	info := "committer " + name + " <" + mail+ "> " + curtime() + "\n\n";
 
 	return info;
@@ -160,14 +155,3 @@ getauthorinfo(): string
 	return info;
 }
 
-getcomment(): string
-{
-	ibuf := bufio->fopen(sys->fildes(0), bufio->OREAD);	
-	return ibuf.gets('\0');
-}
-
-usage()
-{
-	error("commit-tree sha1 [-p sha1]");
-	exit;
-}

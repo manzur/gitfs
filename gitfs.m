@@ -21,19 +21,22 @@ Gitfs: module
 	Shaobject: adt{
 		dirstat: ref Sys->Dir;
 		children: list of big;
-	#This field can be sha1 and also can be path to the file if it's in the
+
+	#This field(sha1) can be sha1 and also can be path to the file if it's in the
 	#checked out working directory
 		sha1: string;
 		otype: string;
+
+	#This field's used from some kind of optimization to
+	#escape rereading
 		data: array of byte;
 	};
 
 	#modifiable part
 	Direntry: adt{	
-		path: big;
+		path, parent: big;
 		name: string;
 		object: ref Shaobject;
-		parent: big;
 	
 		getdirstat: fn(direntry: self ref Direntry): ref Sys->Dir;
 		getfullpath: fn(direntry: self ref Direntry): string;

@@ -6,9 +6,7 @@ Commitmod: module{
 		sha1: string;
 		treesha1: string;
 		parents: list of string; 
-		author: string;
-		committer: string;
-		encoding: string;
+		author, committer, encoding: string;
 		date: ref Daytime->Tm;
 		comment: string;
 	};

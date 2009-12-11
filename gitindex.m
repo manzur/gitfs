@@ -57,6 +57,10 @@ Gitindex : module
 	};
 	
 	init: fn(mods: Mods);
-	readindex:  fn(index:ref Index): int;
+	initindex: fn(): Index;
+	printindex: fn(index: ref Index);
+	readindex:  fn(index: ref Index): int;
+	readindexfromsha1: fn(sha1: string): Index;
 	writeindex: fn(index:ref Index): int;
+
 };

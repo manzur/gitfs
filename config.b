@@ -60,8 +60,7 @@ getint(key: string): (int, int)
 
 getparam(fd: ref Sys->FD): (int, string, string)
 {
-	s := "";
-	key, val: string;
+	s, key, val: string;
 	while(1){
 		s = utils->getline(fd);
 		if(s == "\n") continue;
@@ -127,7 +126,6 @@ readconfig(path: string): int
 
 	#read repository-specific config
 	parseconfigfile(repopath + ".git/config");	
-
 	readenv();
 
 	return 0;
@@ -153,7 +151,7 @@ readenv()
 	addenventry("GIT_AUTHOR_NAME", "authorname");
 	addenventry("GIT_AUTHOR_EMAIL", "authormail");
 	addenventry("GIT_COMMITTER_NAME", "committername");
-	addenventry("GIT_COMMITTER_MAIL", "committermail");
+	addenventry("GIT_COMMITTER_EMAIL", "committermail");
 }
 
 readenventry(key: string): string
@@ -214,15 +212,18 @@ parseconfigfile(path: string)
 
 setbool(key: string, val: int): int
 {
+#FIXME: add implementation
 	return 0;
 }
 
 setint(key: string, val: int): int
 {
+#FIXME: add implementation
 	return 0;
 }
 
 setstring(key, val: string): int
 {
+#FIXME: add implementation
 	return 0;
 }

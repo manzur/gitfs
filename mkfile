@@ -13,12 +13,10 @@ TARG=\
 	mods.dis\
 	pack.dis\
 	path.dis\
-	read-tree.dis\
 	repo.dis\
 	tables.dis\
 	tree.dis\
-	utils.dis\
-	write-tree.dis
+	utils.dis
 
 MODULES=\
 	cat-file.m\
@@ -33,10 +31,8 @@ MODULES=\
 	modules.m\
 	pack.m\
 	path.m\
-	read-tree.m\
 	repo.m\
 	tree.m\
-	write-tree.m\
 	utils.m
 
 SYSMODULES=\

@@ -8,7 +8,6 @@ sprint: import sys;
 gmt, Tm: import daytime;	
 error, ltrim, readsha1file: import utils;	
 
-
 mods: Mods;
 
 init(m: Mods)
@@ -18,8 +17,6 @@ init(m: Mods)
 
 parsedate(date: string): ref Tm
 {
-	while(date != nil && date[0] == ' ')
-		date = date[1:];
 	(tim, zone) := stringmod->toint(date, 10);
 	tm := gmt(tim);
 	
@@ -60,6 +57,7 @@ readcommitbuf(sha1: string, filebuf: array of byte): ref Commit
 		error("File %s is corrupted\n");
 		return nil;
 	}
+	#there's 0 after treesha1, so let's cut it too(len treesha1-1).
 	treesha1 = treesha1[1:len treesha1 - 1];
 
 	parents: list of string;
@@ -69,6 +67,7 @@ readcommitbuf(sha1: string, filebuf: array of byte): ref Commit
 		parentsha1 = parentsha1[1:len parentsha1 - 1];
 		parents = parentsha1 :: parents;
 	}
+
 	author := s[:len s - 1];
 	s = ibuf.gets('\n');
 	committer := s[:len s - 1];

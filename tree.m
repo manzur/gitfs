@@ -12,5 +12,7 @@ Treemod: module
 	init: fn(mods: Mods);
 	readtree: fn(sha1: string): ref Tree;
 	readtreebuf: fn(sha1: string, filebuf: array of byte): ref Tree;
+	writetree: fn(index: ref Gitindex->Index): string;
+	writetreefile: fn(entrylist: list of ref Gitindex->Entry, basename: string): (array of byte, list of ref Gitindex->Entry);
 };
 

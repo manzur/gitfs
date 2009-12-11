@@ -20,10 +20,6 @@ include "string.m";
 	stringmod: String;
 splitr: import stringmod;	
 
-include "utils.m";
-	utils: Utils;
-sha2string, string2sha: import utils;
-
 include "readdir.m";
 	readdir: Readdir;
 	
@@ -43,9 +39,13 @@ include "daytime.m";
 	daytime: Daytime;
 Tm: import daytime;	
 
+include "names.m";
+names: Names;
+
 print : import sys;
 
 global: int;
+MAXINT: con (1 << 31) - 1;
 
 Mymodule : module
 {
@@ -62,15 +62,30 @@ init(nil : ref Draw->Context, args : list of string)
 	readdir = load Readdir Readdir->PATH;
 	filepat := load Filepat Filepat->PATH;
 	exclude  = load Exclude Exclude->PATH;
+	names = load Names Names->PATH;
 	stringmod = load String String->PATH;
 	daytime = load Daytime Daytime->PATH;
 
-	sys->print("%d\n", (nil :: (nil :: nil)) == nil);
-	s: string = nil;
-	pop := pop();
-	if(s == "a")
-		sys->print("a\n");
-	sys->print("%s\n", pop);
+	s := "/root/mydir/myfile";
+	(s1, s2) := basename(s);
+	while( s1 != nil){
+		sys->print("==%s\n", s1);
+		s = s2;
+		(s1, s2) = basename(s);
+	}
+
+	mp := "/root/mydir/myfile";
+	sys->print("==>%s\n", names->basename(mp, nil));
+
+	sys->print("==>%d\n", int (big 1 << 31) - 1);
+	sys->print("==>%d\n", MAXINT);
+	a := "abc";
+	sys->print("->%s", a[0:0]);
+}
+
+kk(ch: chan of array of byte)
+{
+	ch <-= array of byte "heyфa";
 }
 
 pop():string{return "POP";}
@@ -78,6 +93,18 @@ pop():string{return "POP";}
 text(tm: ref Tm): string
 {
 	return daytime->text(tm) + " " + string (tm.tzoff / 3600) + string ((tm.tzoff % 3600 ) /60);
+}
+
+cutprefix(prefix, s: string): string
+{
+	if(len prefix > len s)
+		return nil;
+
+	if(prefix == s[:len prefix]){
+		return s[len prefix:];
+	}
+
+	return nil;
 }
 
 
@@ -91,8 +118,18 @@ printlist(l: list of int)
 	sys->print("\n");
 }
 
+basename(path: string): (string, string)
+{
+	if(path[0] == '/')
+		path = path[1:];
 
+	for(i := 0; i < len path; i++){
+		if(path[i] == '/')
+			return (path[:i], path[i+1:]);
+	}
 
+	return (nil, path);
+}
 
 usage()
 {

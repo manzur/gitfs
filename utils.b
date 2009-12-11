@@ -25,21 +25,20 @@ init(m: Mods)
 
 writesha1file(ch: chan of (int, array of byte))
 {
-
 #FIXME: make deflate level more configurable
 	rqchan := deflatefilter->start("z1");
 	old := array[0] of byte;
-	buf: array of byte;
-	sz := 0;
+	buf: array of byte; sz := 0;
 	state: ref Keyring->DigestState;
 mainloop:
 	while(1)
 	{
 		pick rq := <-rqchan
 		{
-			Finished => if(len rq.buf > 0) 
+			Finished => 
+				if(len rq.buf > 0) 
 					debugmsg("Data remained\n");
-				    break mainloop;
+				break mainloop;
 
 			Result => 
 				new := array[len old + len rq.buf] of byte;
@@ -53,6 +52,7 @@ mainloop:
 				state = keyring->sha1(buf, sz, nil, state);
 				rq.buf[:] = buf[:];
 				rq.reply <-= sz;
+
 			Error =>
 				error(sprint("error ocurred: %s\n", rq.e));
 				return;
@@ -61,6 +61,8 @@ mainloop:
 		
 	sha1 := array[SHALEN] of byte;
 	keyring->sha1(nil, 0, sha1, state);
+
+#FIXME: check the return of save2file
 	save2file(string2path(sha2string(sha1)), old);
 	ch <-= (SHALEN, sha1);	
 }
@@ -84,9 +86,10 @@ mainloop:
 	while(1){
 		pick rq := <-rqchan
 		{
-			Finished => if(len rq.buf > 0) 
+			Finished => 
+				if(len rq.buf > 0) 
 					debugmsg("Data remained\n");
-				    break mainloop;
+				break mainloop;
 
 			Result => 
 				new := array[len old + len rq.buf] of byte;
@@ -151,19 +154,19 @@ objectstat(name: string): (int, Sys->Dir)
 
 sha2string(sha: array of byte): string
 {
-	ret : string = "";
+	ret := "";
 	for(i := 0; i < SHALEN; i++){
 		i1 : int = int sha[i] & 16rf;
 		i2 : int = (int sha[i] & 16rf0) >> 4;
 		ret += hex[i2] + hex[i1];
 	}
+
 	return ret;
 }
 
 bufsha1(buf: array of byte): array of byte
 {
 	sha := array[SHALEN] of byte;
-#FIXME: ERRR
 	keyring->sha1(buf, len buf, sha, nil);
 
 	return sha;
@@ -259,6 +262,7 @@ reverse(l: list of ref Entry): list of ref Entry
 		l1 = hd l :: l1;
 		l = tl l;
 	}
+
 	return l1;
 }
 
@@ -270,8 +274,7 @@ filesha1(filename: string): array of byte
 	}
 
 	buf := array[Sys->ATOMICIO] of byte;
-	cnt : int;
-	state : ref Keyring->DigestState = nil;
+	cnt : int; state : ref Keyring->DigestState = nil;
 	while((cnt = sys->read(fd, buf, Sys->ATOMICIO)) > 0){
 		state = keyring->sha1(buf,cnt, nil, state);		
 	}
@@ -283,10 +286,11 @@ filesha1(filename: string): array of byte
 
 ltrim(s: string): string
 {
-	while(s != nil && s[0] == ' ')
-		s = s[1:];
+	i := 0;
+	while(s != nil && s[i] == ' ')
+		i++;
 		
-	return s;
+	return s[i:];
 }
 
 save2file(path: string, buf: array of byte): int
@@ -317,6 +321,7 @@ bytes2int(buf: array of byte, offset: int): int
 	ret := 0;
 	for(i := 0; i < INTSZ; i++)
 		ret = (ret << 8) | int(buf[offset + i]); 
+
 	return ret;
 }
 
@@ -437,22 +442,6 @@ extractfile(shafilename: string): string
 	return tempfile;
 }
 
-getuserinfo(): ref Strhash[ref Config]
-{
-	iobuf := bufio->open(repopath + "config", Bufio->OREAD);
-	config := Strhash[ref Config].new(10, nil);
-	while((s := iobuf.gets('\n')) != "")		
-	{
-		if(iswhitespace(s))
-			return nil;
-		s = strip(s);
-		(s1, s2) := stringmod->splitl(s, "=");
-		s2 = s2[1:];
-		config.add(s1, ref Config(s1, s2));
-	}
-	return config;
-}
-
 iswhitespace(s: string): int
 {
 	return s == "\n" || s == "\t" || s == " ";
@@ -467,8 +456,7 @@ strip(s: string): string
 
 readline(ibuf: ref Iobuf): string
 {
-	ret := "";
-	i := 0;
+	ret := ""; i := 0;
 	while(1)
 	{
 		c := ibuf.getc();
@@ -476,13 +464,13 @@ readline(ibuf: ref Iobuf): string
 			break;
 		ret[i++] = c;
 	}
+
 	return ret;
 }
 
 getline(fd: ref Sys->FD): string
 {
-	s: string;
-	cnt: int;
+	s: string; cnt: int;
 	buf := array[1] of byte;
 	while(1){
 		cnt = sys->read(fd, buf, len buf);
@@ -490,11 +478,10 @@ getline(fd: ref Sys->FD): string
 			break;
 		s += string buf;
 	}
-
 	if(cnt <= 0)
 		return nil;
-
 	s[len s] = '\n';
+
 	return s;
 }
 
@@ -519,13 +506,13 @@ bytepos(a: array of byte, offset: int, delim: byte): int
 		if(a[i] == delim)
 			return i;
 	}
+
 	return -1;
 }
 
 string2sha(sha1: string): array of byte
 {
 	ret := array[SHALEN] of byte;
-
 	for(i := 0; i < len ret; i++)
 		ret[i] = (hex2byte(sha1[i*2]) << 4) | hex2byte(sha1[i*2+1]);
 
@@ -560,9 +547,8 @@ splitl(s: string, sep: string, count: int): (string, string)
 		return stringmod->splitl(s, sep);
 
 	(s1, s2) := splitl(s, sep, count - 1);	
-	
-	if(len s2 <= 1 ) return (s1, s2);
-
+	if(len s2 <= 1 ) 
+		return (s1, s2);
 	s2 = s2[1:];
 	(s3, s4) := stringmod->splitl(s2, sep);
 	s1 += sep + s3;
@@ -674,3 +660,14 @@ mktempfile(filename: string): string
 	}
 	return "/tmp/" + filename;
 }
+
+sizeofrest(fd: ref Sys->FD): big  
+{
+	curpos := sys->seek(fd, big 0, Sys->SEEKRELA);
+	rest := sys->seek(fd, big 0, Sys->SEEKEND) - curpos;
+	sys->seek(fd, curpos, Sys->SEEKSTART);
+
+	return rest;
+}
+
+

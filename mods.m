@@ -3,6 +3,7 @@ Mods: module
 {
 	PATH: con "/dis/git/mods.dis";
 
+	#System modules
 	sys: Sys;
 	bufio: Bufio;
 	crcmod: Crc;
@@ -14,12 +15,14 @@ Mods: module
 	inflatefilter: Filter;
 	keyring: Keyring;
 	lists: Lists;
+	names: Names;
 	readdir: Readdir;
 	tables: Tables;
 	stringmod: String;
 	styx: Styx;
 	styxservers: Styxservers;
 
+	#Gitfs modules
 	catfilemod: Catfile;
 	checkoutmod: Checkoutmod;
 	commitmod: Commitmod;
@@ -31,13 +34,10 @@ Mods: module
 	pathmod: Pathmod;
 	repo: Repo;
 	treemod: Treemod;
-	readtreemod: Readtree;
 	utils: Utils;
-	writetreemod: Writetree;
 
-	repopath: string;
 	debug: int;
-	index: ref Gitindex->Index;
+	repopath: string;
 	shatable: ref Tables->Strhash[ref Gitfs->Shaobject];
 
 	init: fn(repopath: string, debug: int);

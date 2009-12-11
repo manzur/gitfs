@@ -3,7 +3,7 @@ Checkoutmod: module
 {
 	PATH: con "/dis/git/checkout.dis";
 
-	checkout: fn(sha1: string): ref Gitindex->Index;
 	init: fn(m: Mods);
+	checkout: fn(index: ref Gitindex->Index, sha1: string): ref Gitindex->Index;
 };
 

@@ -9,10 +9,11 @@ sprint: import sys;
 readcommit: import commitmod;	
 Shaobject: import Gitfs;
 Entry, Index: import gitindex;
-readtree: import treemod;	
-dirname, makeabsentdirs, string2path: import pathmod;	
-cutprefix, error, isunixdir, readsha1file, sha2string, string2sha: import utils;	
+readtree: import treemod;
+dirname, makeabsentdirs, string2path: import pathmod;
+cutprefix, error, isunixdir, objectstat, readsha1file, sha2string, string2sha: import utils;	
 
+index: ref Index;
 commit: string;
 
 init(m: Mods)
@@ -20,10 +21,12 @@ init(m: Mods)
 	mods = m;
 }
 
-checkout(sha1: string): ref Index
+checkout(ind: ref Index, sha1: string): ref Index
 {
+	index = ind;
 	commit := readcommit(sha1);
 	index = index.removeentries();
+#FIXME: determine why len repopath - 1
 	checkouttree(repopath[:len repopath-1], commit.treesha1);
 	
 	return index;
@@ -60,7 +63,7 @@ checkoutblob(path, sha1: string)
 	flags := len name & 16r0fff;
 	shaobject := shatable.find(sha1);
 	if(shaobject == nil){
-		dirstat := sys->stat(string2path(sha1)).t1;
+		dirstat := objectstat(string2path(sha1)).t1;
 		shaobject = ref Shaobject(ref dirstat, nil, sha1, "blob", nil);
 		shatable.add(string sha1, shaobject);
 	}

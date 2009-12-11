@@ -13,6 +13,7 @@ include "filepat.m";
 include "filter.m";
 include "keyring.m";
 include "lists.m";
+include "names.m";
 include "readdir.m";
 include "string.m";
 include "styx.m";
@@ -23,6 +24,7 @@ Strhash: import tables;
 
 include "workdir.m";
 
+#Gitfs modules
 include "gitindex.m";
 include "repo.m";
 include "utils.m";
@@ -44,6 +46,7 @@ init(rpath, mpt: string, deb: int)
 	inflatefilter = load Filter Filter->INFLATEPATH;
 	keyring = load Keyring Keyring->PATH;
 	lists = load Lists Lists->PATH;
+	names = load Names Names->PATH;
 	readdir = load Readdir Readdir->PATH;
 	stringmod = load String String->PATH;
 	styx = load Styx Styx->PATH;

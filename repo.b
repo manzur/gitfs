@@ -5,7 +5,7 @@ include "mods.m";
 include "modules.m";
 
 sprint: import sys;
-comparebytes, debugmsg, error, int2bytes, ntohl, packqid, readint, readshort, INTSZ, QIDSZ, SHALEN: import utils;	
+comparebytes, debugmsg, error, int2bytes, ntohl, packqid, readint, readshort, sizeofrest, INTSZ, QIDSZ, SHALEN: import utils;	
 
 mods: Mods;
 indexpath, gitfsindexpath: string;
@@ -13,7 +13,6 @@ indexpath, gitfsindexpath: string;
 init(m: Mods)
 {
 	mods = m;
-#	sys->print("repopath is %s\n", repopath);
 	indexpath = repopath + ".git/index";
 	gitfsindexpath = repopath + ".git/gitfsindex";
 }
@@ -52,10 +51,9 @@ checkstructure(): int
 	path1 := repopath + ".git/objects";
 	path2 := repopath + ".git/refs";
 	path3 := repopath + ".git/HEAD";
-	ret := isdir(path1) && isdir(path2) 
-		&& !sys->stat(path3).t0;  
 
-	return ret;
+	return isdir(path1) && isdir(path2) 
+		&& !sys->stat(path3).t0;  
 }
 
 convertindex(): int
@@ -170,16 +168,6 @@ readgarbage(fd: ref Sys->FD, namelen, flags: int)
 	}
 	
 }
-
-sizeofrest(fd: ref Sys->FD): big  
-{
-	curpos := sys->seek(fd, big 0, Sys->SEEKRELA);
-	rest := sys->seek(fd, big 0, Sys->SEEKEND) - curpos;
-	sys->seek(fd, curpos, Sys->SEEKSTART);
-
-	return rest;
-}
-
 
 
 

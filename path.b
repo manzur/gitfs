@@ -39,7 +39,6 @@ makepathabsolute(path: string): string
 
 resolvepath(curpath: string, path: string): string
 {
-
 	if(curpath == "/") return curpath + path;
 
 	if(path == ".")
@@ -69,14 +68,13 @@ dirname(path: string): string
 
 exists(path: string): int
 {
-	(ret, nil) := sys->stat(path);
-	return ret != -1;
+	return sys->stat(path).t0 != -1;
 }
 
 makeabsentdirs(path: string)
 {
-	if(!exists(path))
-		makeabsentdirs(dirname(path));
+	if(!exists(names->dirname(path)))
+		makeabsentdirs(names->dirname(path));
 	sys->create(path, Sys->OREAD,  Sys->DMDIR|8r755);
 }
 
@@ -85,17 +83,14 @@ cleandir(path: string)
 	entries := readdir->init(path, Readdir->NAME).t0;
 	for(i := 0; i < len entries; i++){
 		if(entries[i].name == ".git") continue;
-
 		fullpath := sprint("%s/%s", path, entries[i].name);
 		if(entries[i].mode & Sys->DMDIR){
 			cleandir(fullpath);
 		}
-
 		if(sys->remove(fullpath) == -1){
 			sys->fprint(sys->fildes(2), "%s couldn't be removed\n", fullpath);
 		}
 	}
-
 }
 
 shaexists(shaname: string): int
@@ -110,7 +105,7 @@ string2path(filename: string): string
 
 basename(path: string): (string, string)
 {
-	if(path[0] == '/')
+	if(path != "" && path[0] == '/')
 		path = path[1:];
 
 	for(i := 0; i < len path; i++){
